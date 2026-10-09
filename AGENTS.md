@@ -16,8 +16,10 @@ emits stage-matched care advice. Prototype, not a medical device.
   wearable form factor for this use case. Status: DeviceMotion + Web Bluetooth
   band adapters delivered and unit-tested; on-device behavior is verified only
   via the README manual checklist (CI cannot cover radios).
-- **M4 target**: embedded wearable (ESP32+IMU pre-impact detector sharing
-  `config.js` thresholds). `na/optional` until M2 lands.
+- **M4 target**: embedded wearable (ESP32+MPU6050 pre-impact band). Status:
+  firmware scaffold delivered with a GENERATED config (`npm run firmware`) and
+  a host-tested pure-C detector; on-hardware verification is manual-only
+  (firmware README checklist).
 - No cloud service target: journals and video stay local by design.
 
 ## Commands
@@ -29,6 +31,7 @@ npm start         # dev server
 npm run train     # retrain + re-export models/risk-v1 (AUC ratchet 0.85)
 npm run evaluate  # false-alarm + alarm-latency summary
 npm run review    # regenerate reports/review-packet.md
+npm run firmware  # regenerate firmware config.h + golden vectors
 node --test --experimental-test-coverage   # coverage snapshot
 ```
 
@@ -41,7 +44,9 @@ node --test --experimental-test-coverage   # coverage snapshot
    objects) and must stay unit-testable in plain Node — see the fake-event and
    fake-GATT tests.
 2. **All numbers live in `core/config.js`** — no magic thresholds in logic
-   files. New tuning knobs go to config with a comment.
+   files. New tuning knobs go to config with a comment. Firmware `config.h` is
+   GENERATED from it (`npm run firmware`) — never hand-edit generated firmware
+   files; the drift tests fail if they diverge.
 3. **Coverage honesty**: sources declare `measured | proxy | unavailable` per
    feature. Never fake a feature; never score unavailable features silently.
 4. **Explainability**: every action carries `reason`; every staging result

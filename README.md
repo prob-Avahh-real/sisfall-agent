@@ -193,6 +193,28 @@ Honesty clause: real-world performance, per-hour false-alarm rates, and
 threshold justification require the SisFall-class run — those numbers are
 pending, and `npm run review` regenerates the packet that tracks that gap.
 
+## Wearable firmware (M4)
+
+`firmware/steadystep_preimpact/` — an ESP32-C3 + MPU6050 pre-impact band that
+runs the SAME pipeline on-device: `config.h` is GENERATED from
+`core/config.js`, a pure-C detector mirrors the web feature/score/forecast
+logic, escalation drives local haptics, and the BLE accel stream is exactly
+what the web "Connect BLE band" mode subscribes to (FFE0/FFE1, 6-byte
+int16-LE packets).
+
+Verification boundaries, stated plainly:
+
+- `npm run firmware` regenerates `config.h` + golden vectors from the shared
+  sources; `test/firmware.test.js` fails on any drift (per-value and
+  byte-identical regeneration).
+- `detector.c` is host-compiled with `-Werror` and run in CI where a C compiler
+  exists: 66 golden vectors must match `core/risk.js` within 1 point
+  (currently exact — worst delta 0), plus walk/tilt/recover behavior checks.
+- NOT hardware-verified: I2C timing, BLE pairing, haptics, battery. The manual
+  checklist lives in `firmware/steadystep_preimpact/README.md`.
+- Caregiver notification is a follow-up: events are logged over Serial; nothing
+  is transmitted off-device yet.
+
 ## Safety & privacy
 
 Prototype only — not a validated medical device or emergency service. Risk
@@ -219,5 +241,7 @@ This is a dev server (`python3 -m http.server`) — not a deployment story.
   adapter + acquisition guide, false-alarm/latency ratchets in CI, review
   packet generator. Real-data numbers and the clinical review itself remain
   open (external dependencies, tracked by `npm run review`).
-- **M4** wearable target: embedded pre-impact detector (e.g., ESP32 + IMU)
-  sharing this config's thresholds; caregiver notification path
+- **M4** 🔄 core delivered: ESP32+MPU6050 pre-impact firmware with generated
+  thresholds, a host-tested C detector (exact score parity + behavior checks),
+  and a BLE stream compatible with the M2 web adapter. On-hardware bring-up and
+  the caregiver notification path remain open.

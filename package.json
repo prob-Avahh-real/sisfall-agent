@@ -9,6 +9,7 @@
     "demo": "node scripts/demo.js",
     "train": "node tools/train.js",
     "evaluate": "node tools/evaluate.js",
-    "review": "node tools/review-packet.js"
+    "review": "node tools/review-packet.js",
+    "firmware": "node tools/gen-firmware.js"
   }
 }
