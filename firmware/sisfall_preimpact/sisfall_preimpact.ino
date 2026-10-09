@@ -1,4 +1,4 @@
-// SteadyStep pre-impact band — ESP32-C3 + MPU6050 (M4).
+// SisFall pre-impact band — ESP32-C3 + MPU6050 (M4).
 //
 // On-device pre-impact detection with local haptics. The accelerometer stream
 // is exposed over BLE exactly as the web sidebar expects (service FFE0,
@@ -26,18 +26,18 @@
 #include "config.h"
 #include "detector.h"
 
-#define SS_I2C_SDA 8
-#define SS_I2C_SCL 9
-#define SS_BUZZER_PIN 3
+#define SF_I2C_SDA 8
+#define SF_I2C_SCL 9
+#define SF_BUZZER_PIN 3
 
 #define MPU6050_ADDR 0x68
 #define MPU6050_ACCEL_SCALE 8192.0f // ±4 g range: 8192 LSB per g
 #define MPU6050_ACCEL_REG 0x3B
 
-static const char* SS_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-static const char* SS_ACCEL_CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
+static const char* SF_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
+static const char* SF_ACCEL_CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
-static ss_detector_t detector;
+static sf_detector_t detector;
 static BLECharacteristic* accelCharacteristic = nullptr;
 static bool bleSubscribed = false;
 static unsigned long sampleIndex = 0;
@@ -51,7 +51,7 @@ class AccelCallbacks : public BLECharacteristicCallbacks {
 };
 
 static void mpuInit() {
-  Wire.begin(SS_I2C_SDA, SS_I2C_SCL);
+  Wire.begin(SF_I2C_SDA, SF_I2C_SCL);
   Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(0x6B); // PWR_MGMT_1
   Wire.write(0x00); // wake
@@ -82,39 +82,39 @@ static bool mpuReadAccel(float out[3]) {
 static void updateHaptics(uint8_t state, unsigned long nowMs) {
   if (state != lastBuzzedState) lastBuzzedState = state;
   switch (state) {
-    case SS_STABLE: ledcWrite(0, 0); break;
-    case SS_CAUTION: ledcWrite(0, (nowMs % 4000UL) < 120UL ? 128 : 0); break;
-    case SS_IMMINENT: ledcWrite(0, (nowMs % 500UL) < 160UL ? 200 : 0); break;
-    default: ledcWrite(0, 255); break; // SS_DANGER
+    case SF_STABLE: ledcWrite(0, 0); break;
+    case SF_CAUTION: ledcWrite(0, (nowMs % 4000UL) < 120UL ? 128 : 0); break;
+    case SF_IMMINENT: ledcWrite(0, (nowMs % 500UL) < 160UL ? 200 : 0); break;
+    default: ledcWrite(0, 255); break; // SF_DANGER
   }
 }
 
 static void setupBle() {
-  BLEDevice::init("SteadyStep Band");
+  BLEDevice::init("SisFall Band");
   BLEServer* server = BLEDevice::createServer();
-  BLEService* service = server->createService(SS_SERVICE_UUID);
+  BLEService* service = server->createService(SF_SERVICE_UUID);
   accelCharacteristic = service->createCharacteristic(
-      SS_ACCEL_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ);
+      SF_ACCEL_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ);
   accelCharacteristic->addDescriptor(new BLE2902());
   accelCharacteristic->setCallbacks(new AccelCallbacks());
   service->start();
-  server->getAdvertising()->addServiceUUID(SS_SERVICE_UUID);
+  server->getAdvertising()->addServiceUUID(SF_SERVICE_UUID);
   server->getAdvertising()->start();
 }
 
 void setup() {
   Serial.begin(115200);
   ledcSetup(0, 2000, 8);
-  ledcAttachPin(SS_BUZZER_PIN, 0);
+  ledcAttachPin(SF_BUZZER_PIN, 0);
   mpuInit();
-  ss_detector_init(&detector);
+  sf_detector_init(&detector);
   setupBle();
-  Serial.println("SteadyStep band ready");
+  Serial.println("SisFall band ready");
 }
 
 void loop() {
   static unsigned long lastSampleUs = 0;
-  const unsigned long intervalUs = (unsigned long)(1000000.0f / SS_TARGET_HZ);
+  const unsigned long intervalUs = (unsigned long)(1000000.0f / SF_TARGET_HZ);
   const unsigned long nowUs = micros();
   if (nowUs - lastSampleUs < intervalUs) return;
   lastSampleUs = nowUs;
@@ -123,7 +123,7 @@ void loop() {
   if (!mpuReadAccel(accel)) return;
 
   const float t = (float)nowUs / 1000000.0f;
-  const ss_result_t result = ss_detector_update(&detector, t, accel[0], accel[1], accel[2]);
+  const sf_result_t result = sf_detector_update(&detector, t, accel[0], accel[1], accel[2]);
   updateHaptics(result.state, millis());
 
   if (result.ready && result.changed) {

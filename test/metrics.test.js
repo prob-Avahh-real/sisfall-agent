@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateScenarios } from '../tools/evaluate.js';
 import { LearnedRiskModel } from '../core/learned.js';
-import { SteadyStepAgent } from '../core/agent.js';
+import { SisFallAgent } from '../core/agent.js';
 import { runScenario } from '../sources/sim.js';
 import artifact from '../models/risk-v1.js';
 
@@ -27,7 +27,7 @@ test('alarm-latency target: every near-fall alarmed before the danger band, mean
 test('learned-model path: near-fall alarmed, stable silent (agent integration)', () => {
   const model = LearnedRiskModel.fromArtifact(artifact);
 
-  const nearAgent = new SteadyStepAgent({ model });
+  const nearAgent = new SisFallAgent({ model });
   let alarmed = false;
   let sawModelOverride = false;
   for (const observation of runScenario('near-fall', { seed: 1 }).observations) {
@@ -38,7 +38,7 @@ test('learned-model path: near-fall alarmed, stable silent (agent integration)',
   assert.ok(sawModelOverride, 'learned model overrode the rule score');
   assert.ok(alarmed, 'learned path alarmed on the near-fall');
 
-  const stableAgent = new SteadyStepAgent({ model });
+  const stableAgent = new SisFallAgent({ model });
   let audio = 0;
   for (const observation of runScenario('stable', { seed: 1 }).observations) {
     const step = stableAgent.ingest(observation);

@@ -20,15 +20,15 @@ static float angle_between(const float a[3], const float b[3]) {
   return acosf(c) * 180.0f / (float)M_PI;
 }
 
-float ss_score(const ss_features_t* f) {
-  static const float weights[SS_FEATURE_COUNT] = { SS_WEIGHT_TORSO, SS_WEIGHT_OFFSET, SS_WEIGHT_DROP, SS_WEIGHT_ASYM };
-  static const float starts[SS_FEATURE_COUNT] = { SS_SCALE_TORSO_START, SS_SCALE_OFFSET_START, SS_SCALE_DROP_START, SS_SCALE_ASYM_START };
-  static const float fulls[SS_FEATURE_COUNT] = { SS_SCALE_TORSO_FULL, SS_SCALE_OFFSET_FULL, SS_SCALE_DROP_FULL, SS_SCALE_ASYM_FULL };
-  static const float cov[SS_FEATURE_COUNT] = { SS_COVERAGE_MEASURED, SS_COVERAGE_PROXY, SS_COVERAGE_PROXY, SS_COVERAGE_UNAVAILABLE };
-  const float values[SS_FEATURE_COUNT] = { f->torso_lean, f->lateral_offset, f->hip_drop, f->knee_asym };
+float sf_score(const sf_features_t* f) {
+  static const float weights[SF_FEATURE_COUNT] = { SF_WEIGHT_TORSO, SF_WEIGHT_OFFSET, SF_WEIGHT_DROP, SF_WEIGHT_ASYM };
+  static const float starts[SF_FEATURE_COUNT] = { SF_SCALE_TORSO_START, SF_SCALE_OFFSET_START, SF_SCALE_DROP_START, SF_SCALE_ASYM_START };
+  static const float fulls[SF_FEATURE_COUNT] = { SF_SCALE_TORSO_FULL, SF_SCALE_OFFSET_FULL, SF_SCALE_DROP_FULL, SF_SCALE_ASYM_FULL };
+  static const float cov[SF_FEATURE_COUNT] = { SF_COVERAGE_MEASURED, SF_COVERAGE_PROXY, SF_COVERAGE_PROXY, SF_COVERAGE_UNAVAILABLE };
+  const float values[SF_FEATURE_COUNT] = { f->torso_lean, f->lateral_offset, f->hip_drop, f->knee_asym };
   float num = 0.0f;
   float den = 0.0f;
-  for (int i = 0; i < SS_FEATURE_COUNT; ++i) {
+  for (int i = 0; i < SF_FEATURE_COUNT; ++i) {
     float p = clamp01f((values[i] - starts[i]) / (fulls[i] - starts[i]));
     num += weights[i] * p * cov[i];
     den += weights[i] * cov[i];
@@ -36,7 +36,7 @@ float ss_score(const ss_features_t* f) {
   return den > 0.0f ? (num / den) * 100.0f : 0.0f;
 }
 
-void ss_detector_init(ss_detector_t* d) {
+void sf_detector_init(sf_detector_t* d) {
   for (int i = 0; i < 3; ++i) {
     d->gravity[i] = 0.0f;
     d->up[i] = 0.0f;
@@ -51,26 +51,26 @@ void ss_detector_init(ss_detector_t* d) {
   d->first = 1;
   d->ring_count = 0;
   d->ring_head = 0;
-  d->state = SS_STABLE;
+  d->state = SF_STABLE;
 }
 
-static void ring_push(ss_detector_t* d, float t, float s) {
+static void ring_push(sf_detector_t* d, float t, float s) {
   d->ring_t[d->ring_head] = t;
   d->ring_s[d->ring_head] = s;
-  d->ring_head = (d->ring_head + 1) % SS_SLOPE_CAP;
-  if (d->ring_count < SS_SLOPE_CAP) d->ring_count += 1;
+  d->ring_head = (d->ring_head + 1) % SF_SLOPE_CAP;
+  if (d->ring_count < SF_SLOPE_CAP) d->ring_count += 1;
 }
 
-static float fit_slope(const ss_detector_t* d) {
+static float fit_slope(const sf_detector_t* d) {
   int n = d->ring_count;
-  if (n > SS_SLOPE_WINDOW) n = SS_SLOPE_WINDOW;
+  if (n > SF_SLOPE_WINDOW) n = SF_SLOPE_WINDOW;
   if (n < 4) return 0.0f;
   float sx = 0.0f;
   float sy = 0.0f;
   float sxx = 0.0f;
   float sxy = 0.0f;
   for (int i = 0; i < n; ++i) {
-    int idx = (d->ring_head - n + i + SS_SLOPE_CAP) % SS_SLOPE_CAP;
+    int idx = (d->ring_head - n + i + SF_SLOPE_CAP) % SF_SLOPE_CAP;
     float x = d->ring_t[idx];
     float y = d->ring_s[idx];
     sx += x;
@@ -83,8 +83,8 @@ static float fit_slope(const ss_detector_t* d) {
   return ((float)n * sxy - sx * sy) / denom;
 }
 
-ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, float az) {
-  ss_result_t r;
+sf_result_t sf_detector_update(sf_detector_t* d, float t, float ax, float ay, float az) {
+  sf_result_t r;
   r.ready = 0;
   r.state = d->state;
   r.changed = 0;
@@ -96,7 +96,7 @@ ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, fl
   r.features.hip_drop = 0.0f;
   r.features.knee_asym = 0.0f;
 
-  float dt = d->first ? (1.0f / SS_TARGET_HZ) : (t - d->last_t);
+  float dt = d->first ? (1.0f / SF_TARGET_HZ) : (t - d->last_t);
   if (dt < 0.001f) dt = 0.001f;
   if (dt > 0.2f) dt = 0.2f;
   d->last_t = t;
@@ -108,7 +108,7 @@ ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, fl
     for (int i = 0; i < 3; ++i) d->gravity[i] = accel[i];
     d->gravity_init = 1;
   } else {
-    float alpha = 1.0f - expf(-dt / SS_GRAVITY_TAU);
+    float alpha = 1.0f - expf(-dt / SF_GRAVITY_TAU);
     for (int i = 0; i < 3; ++i) d->gravity[i] += alpha * (accel[i] - d->gravity[i]);
   }
 
@@ -116,7 +116,7 @@ ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, fl
     if (fabsf(norm3(accel) - 1.0f) < 0.15f) {
       for (int i = 0; i < 3; ++i) d->up_sum[i] += accel[i];
       d->up_count += 1;
-      if (d->up_count >= SS_UP_REF_FRAMES) {
+      if (d->up_count >= SF_UP_REF_FRAMES) {
         float n = norm3(d->up_sum);
         if (n > 1e-6f) {
           for (int i = 0; i < 3; ++i) d->up[i] = d->up_sum[i] / n;
@@ -135,10 +135,10 @@ ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, fl
 
   float along = dot3(d->gravity, d->up) - 1.0f;
   if (along < 0.0f) {
-    d->drop_vel += ((-along) * SS_DROP_GAIN - d->drop_vel * SS_DROP_DECAY) * dt;
+    d->drop_vel += ((-along) * SF_DROP_GAIN - d->drop_vel * SF_DROP_DECAY) * dt;
     if (d->drop_vel < 0.0f) d->drop_vel = 0.0f;
   } else {
-    d->drop_vel -= d->drop_vel * SS_DROP_DECAY * dt;
+    d->drop_vel -= d->drop_vel * SF_DROP_DECAY * dt;
     if (d->drop_vel < 0.0f) d->drop_vel = 0.0f;
   }
 
@@ -148,17 +148,17 @@ ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, fl
   float hp_res[3];
   for (int i = 0; i < 3; ++i) hp_res[i] = hp[i] - hp_up * d->up[i];
   float hph = norm3(hp_res);
-  float alpha_l = 1.0f - expf(-dt / SS_LATERAL_TAU);
+  float alpha_l = 1.0f - expf(-dt / SF_LATERAL_TAU);
   d->lateral_mag += alpha_l * (hph - d->lateral_mag);
 
-  ss_features_t f;
+  sf_features_t f;
   f.torso_lean = torso_lean;
-  f.lateral_offset = d->lateral_mag / SS_LATERAL_GAIN;
+  f.lateral_offset = d->lateral_mag / SF_LATERAL_GAIN;
   f.hip_drop = clamp01f(d->drop_vel);
   f.knee_asym = 0.0f;
   r.features = f;
 
-  float score = ss_score(&f);
+  float score = sf_score(&f);
   r.score = score;
 
   ring_push(d, t, score);
@@ -166,19 +166,19 @@ ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, fl
   r.slope = slope;
 
   float ttd = NAN;
-  if (slope >= SS_MIN_RISE_RATE) {
-    ttd = score >= SS_THRESHOLD_DANGER ? 0.0f : (SS_THRESHOLD_DANGER - score) / slope;
+  if (slope >= SF_MIN_RISE_RATE) {
+    ttd = score >= SF_THRESHOLD_DANGER ? 0.0f : (SF_THRESHOLD_DANGER - score) / slope;
   }
   r.time_to_danger = ttd;
 
-  int imminent = (slope >= SS_MIN_RISE_RATE) && (score >= SS_SCORE_FLOOR) &&
-                 !isnan(ttd) && (ttd <= SS_IMMINENT_HORIZON_SEC);
+  int imminent = (slope >= SF_MIN_RISE_RATE) && (score >= SF_SCORE_FLOOR) &&
+                 !isnan(ttd) && (ttd <= SF_IMMINENT_HORIZON_SEC);
 
   uint8_t state;
-  if (score >= SS_THRESHOLD_DANGER) state = SS_DANGER;
-  else if (imminent) state = SS_IMMINENT;
-  else if (score >= SS_THRESHOLD_CAUTION) state = SS_CAUTION;
-  else state = SS_STABLE;
+  if (score >= SF_THRESHOLD_DANGER) state = SF_DANGER;
+  else if (imminent) state = SF_IMMINENT;
+  else if (score >= SF_THRESHOLD_CAUTION) state = SF_CAUTION;
+  else state = SF_STABLE;
 
   r.changed = (state != d->state) ? 1 : 0;
   d->state = state;

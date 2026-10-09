@@ -1,4 +1,4 @@
-# SteadyStep — fall-risk posture agent
+# SisFall — fall-risk posture agent
 
 An agent that watches movement (camera pose or wearable IMU), **predicts dangerous
 postures before they become falls**, factors in non-motion symptoms you report
@@ -6,6 +6,11 @@ postures before they become falls**, factors in non-motion symptoms you report
 and produces **stage-matched care advice** — all locally, nothing uploaded.
 
 This is a prototype, not a medical device. See "Safety" below.
+
+> Name note: **SisFall** the project is independent of the public **SisFall
+> dataset** (Universidad de Antioquia) it can optionally train on.
+> Dataset-facing files — `tools/sisfall.js`, `data/sisfall/`, the `--sisfall`
+> flag, model provenance — keep the dataset's name.
 
 ## Quick start
 
@@ -167,7 +172,7 @@ Chrome.
 
 The rule scorer stays the default; a learned logistic-regression window scorer
 plugs in behind the same contract via the agent constructor
-(`new SteadyStepAgent({ model })`; see `node scripts/demo.js near-fall --model`).
+(`new SisFallAgent({ model })`; see `node scripts/demo.js near-fall --model`).
 
 - `core/learned.js` — ONE window vectorizer shared by training and runtime
   (lean/offset/drop/asymmetry max·mean·rate over ~1 s). Unavailable features
@@ -195,7 +200,7 @@ pending, and `npm run review` regenerates the packet that tracks that gap.
 
 ## Wearable firmware (M4)
 
-`firmware/steadystep_preimpact/` — an ESP32-C3 + MPU6050 pre-impact band that
+`firmware/sisfall_preimpact/` — an ESP32-C3 + MPU6050 pre-impact band that
 runs the SAME pipeline on-device: `config.h` is GENERATED from
 `core/config.js`, a pure-C detector mirrors the web feature/score/forecast
 logic, escalation drives local haptics, and the BLE accel stream is exactly
@@ -211,7 +216,7 @@ Verification boundaries, stated plainly:
   exists: 66 golden vectors must match `core/risk.js` within 1 point
   (currently exact — worst delta 0), plus walk/tilt/recover behavior checks.
 - NOT hardware-verified: I2C timing, BLE pairing, haptics, battery. The manual
-  checklist lives in `firmware/steadystep_preimpact/README.md`.
+  checklist lives in `firmware/sisfall_preimpact/README.md`.
 - Caregiver notification is a follow-up: events are logged over Serial; nothing
   is transmitted off-device yet.
 

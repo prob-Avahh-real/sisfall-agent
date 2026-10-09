@@ -33,7 +33,7 @@ export function adviceFor(symptom, windowRemainingSec = 0) {
     windowRemainingSec > 60 ? ` Heightened watch for about ${Math.round(windowRemainingSec / 60)} min.` : '';
   switch (symptom) {
     case 'dizziness':
-      return `Sit down and hold support now. SteadyStep will warn earlier while this lasts.${windowNote}`;
+      return `Sit down and hold support now. SisFall will warn earlier while this lasts.${windowNote}`;
     case 'fatigue':
       return `Consider resting before continuing on your feet.${windowNote}`;
     case 'sleepDebt':

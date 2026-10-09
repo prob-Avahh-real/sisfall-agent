@@ -5,7 +5,7 @@
 //
 //   node scripts/demo.js [stable|wobble|wobble-shift|dizzy-walk|near-fall|imu-near-fall]
 
-import { SteadyStepAgent } from '../core/agent.js';
+import { SisFallAgent } from '../core/agent.js';
 import { LearnedRiskModel } from '../core/learned.js';
 import { runScenario, interleave, SCENARIOS } from '../sources/sim.js';
 
@@ -24,7 +24,7 @@ if (useModel) {
   model = LearnedRiskModel.fromArtifact(artifact);
   console.log(`model: ${artifact.version} (validation AUC ${artifact.metrics.auc.toFixed(3)}) — rules kept as ruleScore`);
 }
-const agent = new SteadyStepAgent({ model });
+const agent = new SisFallAgent({ model });
 let lastState = null;
 let lastStage = null;
 

@@ -35,47 +35,47 @@ function buildConfigHeader() {
   push('#pragma once');
   push('');
   push('// Sampling + IMU heuristics (config.imu, config.device)');
-  push(`#define SS_TARGET_HZ ${f4(cfg.device.targetHz)}`);
-  push(`#define SS_UP_REF_FRAMES ${cfg.imu.upRefFrames}`);
-  push(`#define SS_GRAVITY_TAU ${f4(cfg.imu.gravityTau)}`);
-  push(`#define SS_DROP_GAIN ${f4(cfg.imu.dropGain)}`);
-  push(`#define SS_DROP_DECAY ${f4(cfg.imu.dropDecay)}`);
-  push(`#define SS_LATERAL_TAU ${f4(cfg.imu.lateralTau)}`);
-  push(`#define SS_LATERAL_GAIN ${f4(cfg.imu.lateralGain)}`);
+  push(`#define SF_TARGET_HZ ${f4(cfg.device.targetHz)}`);
+  push(`#define SF_UP_REF_FRAMES ${cfg.imu.upRefFrames}`);
+  push(`#define SF_GRAVITY_TAU ${f4(cfg.imu.gravityTau)}`);
+  push(`#define SF_DROP_GAIN ${f4(cfg.imu.dropGain)}`);
+  push(`#define SF_DROP_DECAY ${f4(cfg.imu.dropDecay)}`);
+  push(`#define SF_LATERAL_TAU ${f4(cfg.imu.lateralTau)}`);
+  push(`#define SF_LATERAL_GAIN ${f4(cfg.imu.lateralGain)}`);
   push('');
   push('// Score weights (config.risk.weights)');
-  push(`#define SS_WEIGHT_TORSO ${f4(cfg.risk.weights.torsoLean)}`);
-  push(`#define SS_WEIGHT_OFFSET ${f4(cfg.risk.weights.lateralOffset)}`);
-  push(`#define SS_WEIGHT_DROP ${f4(cfg.risk.weights.hipDropSpeed)}`);
-  push(`#define SS_WEIGHT_ASYM ${f4(cfg.risk.weights.kneeAsymmetry)}`);
+  push(`#define SF_WEIGHT_TORSO ${f4(cfg.risk.weights.torsoLean)}`);
+  push(`#define SF_WEIGHT_OFFSET ${f4(cfg.risk.weights.lateralOffset)}`);
+  push(`#define SF_WEIGHT_DROP ${f4(cfg.risk.weights.hipDropSpeed)}`);
+  push(`#define SF_WEIGHT_ASYM ${f4(cfg.risk.weights.kneeAsymmetry)}`);
   push('');
   push('// Feature pressure scales (config.risk.scales)');
-  push(`#define SS_SCALE_TORSO_START ${f4(cfg.risk.scales.torsoLean.start)}`);
-  push(`#define SS_SCALE_TORSO_FULL ${f4(cfg.risk.scales.torsoLean.full)}`);
-  push(`#define SS_SCALE_OFFSET_START ${f4(cfg.risk.scales.lateralOffset.start)}`);
-  push(`#define SS_SCALE_OFFSET_FULL ${f4(cfg.risk.scales.lateralOffset.full)}`);
-  push(`#define SS_SCALE_DROP_START ${f4(cfg.risk.scales.hipDropSpeed.start)}`);
-  push(`#define SS_SCALE_DROP_FULL ${f4(cfg.risk.scales.hipDropSpeed.full)}`);
-  push(`#define SS_SCALE_ASYM_START ${f4(cfg.risk.scales.kneeAsymmetry.start)}`);
-  push(`#define SS_SCALE_ASYM_FULL ${f4(cfg.risk.scales.kneeAsymmetry.full)}`);
+  push(`#define SF_SCALE_TORSO_START ${f4(cfg.risk.scales.torsoLean.start)}`);
+  push(`#define SF_SCALE_TORSO_FULL ${f4(cfg.risk.scales.torsoLean.full)}`);
+  push(`#define SF_SCALE_OFFSET_START ${f4(cfg.risk.scales.lateralOffset.start)}`);
+  push(`#define SF_SCALE_OFFSET_FULL ${f4(cfg.risk.scales.lateralOffset.full)}`);
+  push(`#define SF_SCALE_DROP_START ${f4(cfg.risk.scales.hipDropSpeed.start)}`);
+  push(`#define SF_SCALE_DROP_FULL ${f4(cfg.risk.scales.hipDropSpeed.full)}`);
+  push(`#define SF_SCALE_ASYM_START ${f4(cfg.risk.scales.kneeAsymmetry.start)}`);
+  push(`#define SF_SCALE_ASYM_FULL ${f4(cfg.risk.scales.kneeAsymmetry.full)}`);
   push('');
   push('// Coverage discounts (config.risk.coverageWeight) — firmware coverage set:');
   push('// lean measured, drop/lateral proxy, knee asymmetry unavailable.');
-  push(`#define SS_COVERAGE_MEASURED ${f4(cfg.risk.coverageWeight.measured)}`);
-  push(`#define SS_COVERAGE_PROXY ${f4(cfg.risk.coverageWeight.proxy)}`);
-  push(`#define SS_COVERAGE_UNAVAILABLE ${f4(cfg.risk.coverageWeight.unavailable)}`);
+  push(`#define SF_COVERAGE_MEASURED ${f4(cfg.risk.coverageWeight.measured)}`);
+  push(`#define SF_COVERAGE_PROXY ${f4(cfg.risk.coverageWeight.proxy)}`);
+  push(`#define SF_COVERAGE_UNAVAILABLE ${f4(cfg.risk.coverageWeight.unavailable)}`);
   push('');
   push('// Bands + forecast gates (config.risk.thresholds, config.forecast)');
-  push(`#define SS_THRESHOLD_CAUTION ${f4(cfg.risk.thresholds.caution)}`);
-  push(`#define SS_THRESHOLD_DANGER ${f4(cfg.risk.thresholds.danger)}`);
-  push(`#define SS_MIN_RISE_RATE ${f4(cfg.forecast.minRiseRate)}`);
-  push(`#define SS_SCORE_FLOOR ${f4(cfg.forecast.scoreFloor)}`);
-  push(`#define SS_IMMINENT_HORIZON_SEC ${f4(cfg.forecast.imminentHorizonSec)}`);
+  push(`#define SF_THRESHOLD_CAUTION ${f4(cfg.risk.thresholds.caution)}`);
+  push(`#define SF_THRESHOLD_DANGER ${f4(cfg.risk.thresholds.danger)}`);
+  push(`#define SF_MIN_RISE_RATE ${f4(cfg.forecast.minRiseRate)}`);
+  push(`#define SF_SCORE_FLOOR ${f4(cfg.forecast.scoreFloor)}`);
+  push(`#define SF_IMMINENT_HORIZON_SEC ${f4(cfg.forecast.imminentHorizonSec)}`);
   push('// Trend window: 0.8 s (12 frames at the 15 Hz reference rate)');
-  push(`#define SS_SLOPE_WINDOW ${slopeWindowFrames}`);
+  push(`#define SF_SLOPE_WINDOW ${slopeWindowFrames}`);
   push('');
   push('// Event cadence (config.policy)');
-  push(`#define SS_EVENT_COOLDOWN_SEC ${f4(cfg.policy.audioCooldownSec)}`);
+  push(`#define SF_EVENT_COOLDOWN_SEC ${f4(cfg.policy.audioCooldownSec)}`);
   push('');
   return lines.join('\n');
 }
@@ -99,20 +99,20 @@ function buildGoldenVectors() {
     '// under the firmware coverage set. detector_host_test.c must match within 1 point.',
     '#pragma once',
     '',
-    `#define SS_GOLDEN_COUNT ${inputs.length}`,
+    `#define SF_GOLDEN_COUNT ${inputs.length}`,
     '',
-    'static const float SS_GOLDEN_INPUT[SS_GOLDEN_COUNT][4] = {',
+    'static const float SF_GOLDEN_INPUT[SF_GOLDEN_COUNT][4] = {',
     rows,
     '};',
     '',
-    `static const int SS_GOLDEN_EXPECTED[SS_GOLDEN_COUNT] = { ${expected.join(', ')} };`,
+    `static const int SF_GOLDEN_EXPECTED[SF_GOLDEN_COUNT] = { ${expected.join(', ')} };`,
     '',
   ].join('\n');
 }
 
 const FILES = {
-  'firmware/steadystep_preimpact/config.h': buildConfigHeader,
-  'firmware/steadystep_preimpact/test/golden_vectors.h': buildGoldenVectors,
+  'firmware/sisfall_preimpact/config.h': buildConfigHeader,
+  'firmware/sisfall_preimpact/test/golden_vectors.h': buildGoldenVectors,
 };
 
 /** @returns {Record<string, string>} filename -> content (for drift tests). */

@@ -3,12 +3,12 @@
 // from this harness are enforced in test/metrics.test.js; the CLI prints the
 // same numbers for humans. Deterministic: seeded scenarios, no wall clock.
 
-import { SteadyStepAgent } from '../core/agent.js';
+import { SisFallAgent } from '../core/agent.js';
 import { runScenario, interleave } from '../sources/sim.js';
 
 /** One scenario run through the agent; collects alarm + latency facts. */
 export function evaluateRun(name, seed, { model = null, config } = {}) {
-  const agent = new SteadyStepAgent({ config, model });
+  const agent = new SisFallAgent({ config, model });
   const { observations, checkins } = runScenario(name, { seed });
   const result = {
     name,

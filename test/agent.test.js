@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SteadyStepAgent } from '../core/agent.js';
+import { SisFallAgent } from '../core/agent.js';
 import { runScenario, interleave } from '../sources/sim.js';
 
-function runScenarioWithAgent(name, agent = new SteadyStepAgent()) {
+function runScenarioWithAgent(name, agent = new SisFallAgent()) {
   const { observations, checkins } = runScenario(name);
   const steps = [];
   const transitions = [];
@@ -78,7 +78,7 @@ test('dizziness check-in fuses into risk; identical walk stays silent without it
   const withSymptoms = runScenarioWithAgent('dizzy-walk');
 
   // Control: same observations, no check-in.
-  const controlAgent = new SteadyStepAgent();
+  const controlAgent = new SisFallAgent();
   const controlTransitions = [];
   let prev = null;
   for (const observation of runScenario('dizzy-walk').observations) {

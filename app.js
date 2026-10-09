@@ -1,4 +1,4 @@
-import { SteadyStepAgent } from './core/agent.js';
+import { SisFallAgent } from './core/agent.js';
 import { RiskSmoother } from './core/risk.js';
 import { DEFAULT_CONFIG } from './core/config.js';
 import { poseObservation } from './sources/pose.js';
@@ -67,7 +67,7 @@ const FEATURE_NAMES = { torsoLean: 'lean', lateralOffset: 'balance shift', hipDr
 const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function startSession() {
-  agent = new SteadyStepAgent();
+  agent = new SisFallAgent();
   smoother = new RiskSmoother();
   displayedStage = null;
   previousPose = null;

@@ -1,4 +1,4 @@
-// Pure-C pre-impact detector for the SteadyStep wearable (M4).
+// Pure-C pre-impact detector for the SisFall wearable (M4).
 //
 // No Arduino dependencies: compiles and runs on the host for tests (see
 // test/detector_host_test.c). Mirrors the JS pipeline: gravity low-pass ->
@@ -9,8 +9,8 @@
 // core/config.js by tools/gen-firmware.js — a Node drift test enforces parity,
 // so the wearable can never silently diverge from the web/agent thresholds.
 
-#ifndef STEADYSTEP_DETECTOR_H
-#define STEADYSTEP_DETECTOR_H
+#ifndef SISFALL_DETECTOR_H
+#define SISFALL_DETECTOR_H
 
 #include <stdint.h>
 
@@ -18,14 +18,14 @@
 extern "C" {
 #endif
 
-#define SS_FEATURE_COUNT 4
-#define SS_SLOPE_CAP 64 // ring capacity for the score trend history (>= SS_SLOPE_WINDOW + margin)
+#define SF_FEATURE_COUNT 4
+#define SF_SLOPE_CAP 64 // ring capacity for the score trend history (>= SF_SLOPE_WINDOW + margin)
 
-enum ss_state {
-  SS_STABLE = 0,
-  SS_CAUTION = 1,
-  SS_IMMINENT = 2,
-  SS_DANGER = 3
+enum sf_state {
+  SF_STABLE = 0,
+  SF_CAUTION = 1,
+  SF_IMMINENT = 2,
+  SF_DANGER = 3
 };
 
 typedef struct {
@@ -33,7 +33,7 @@ typedef struct {
   float lateral_offset; // proxy: smoothed high-pass horizontal magnitude / gain
   float hip_drop;       // proxy: leaky-integrated downward acceleration
   float knee_asym;      // unavailable on a single IMU; kept for score parity
-} ss_features_t;
+} sf_features_t;
 
 typedef struct {
   float gravity[3];
@@ -46,31 +46,31 @@ typedef struct {
   float lateral_mag;
   float last_t;
   int first;
-  float ring_t[SS_SLOPE_CAP];
-  float ring_s[SS_SLOPE_CAP];
+  float ring_t[SF_SLOPE_CAP];
+  float ring_s[SF_SLOPE_CAP];
   int ring_count;
   int ring_head;
   uint8_t state;
-} ss_detector_t;
+} sf_detector_t;
 
 typedef struct {
   uint8_t ready;        // 0 until the upright reference is captured
-  uint8_t state;        // ss_state
+  uint8_t state;        // sf_state
   uint8_t changed;      // state differs from the previous call
   float score;          // coverage-aware score, 0-100
   float slope;          // score trend, points per second
   float time_to_danger; // seconds; NAN when not rising toward danger
-  ss_features_t features;
-} ss_result_t;
+  sf_features_t features;
+} sf_result_t;
 
 /** Coverage-aware score — same formula as core/risk.js for the firmware's
  *  fixed coverage set (lean measured; drop/lateral proxy; asymmetry absent). */
-float ss_score(const ss_features_t* features);
+float sf_score(const sf_features_t* features);
 
-void ss_detector_init(ss_detector_t* d);
+void sf_detector_init(sf_detector_t* d);
 
 /** Feed one raw accelerometer sample (g units). Returns the evaluated state. */
-ss_result_t ss_detector_update(ss_detector_t* d, float t, float ax, float ay, float az);
+sf_result_t sf_detector_update(sf_detector_t* d, float t, float ax, float ay, float az);
 
 #ifdef __cplusplus
 }

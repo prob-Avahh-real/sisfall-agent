@@ -1,4 +1,4 @@
-// Canonical feature schema shared by every SteadyStep source.
+// Canonical feature schema shared by every SisFall source.
 //
 // A source (camera pose, phone/wearable IMU, simulator) reports two objects:
 //

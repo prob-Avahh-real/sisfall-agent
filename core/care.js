@@ -27,7 +27,7 @@ export const STAGE_DEFINITIONS = [
     advice: [
       { kind: 'activity', text: 'Add a short balance routine most days (heel-to-toe standing, slow sit-to-stand ×5).' },
       { kind: 'environment', text: 'Review footwear, rugs, and lighting along your usual routes.' },
-      { kind: 'monitoring', text: 'Keep SteadyStep active during walks; treat caution cues as real.' },
+      { kind: 'monitoring', text: 'Keep SisFall active during walks; treat caution cues as real.' },
     ],
   },
   {

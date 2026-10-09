@@ -1,6 +1,6 @@
-# AGENTS.md — steadystep-agent
+# AGENTS.md — sisfall-agent
 
-Project-scoped rules for assistants working on SteadyStep. Root `AGENTS.md`
+Project-scoped rules for assistants working on SisFall. Root `AGENTS.md`
 applies on top; this file records purpose, targets, and invariants specific here.
 
 ## Purpose
@@ -8,6 +8,9 @@ applies on top; this file records purpose, targets, and invariants specific here
 Fall-prevention agent: predicts dangerous postures from movement data (camera
 pose / IMU), fuses non-motion symptom check-ins, stages risk longitudinally, and
 emits stage-matched care advice. Prototype, not a medical device.
+Naming: the project name (SisFall) is independent of the external SisFall
+dataset; dataset-facing paths (`tools/sisfall.js`, `data/sisfall/`, the
+`--sisfall` flag) keep the dataset's name — do not rename those.
 
 ## Targets (用途决定 Target, root rule 5)
 

@@ -1,4 +1,4 @@
-// SteadyStepAgent: the perception -> reasoning -> decision loop.
+// SisFallAgent: the perception -> reasoning -> decision loop.
 //
 //   ingest(observation) =>
 //     baseline.update(features)          learn "normal for this person"
@@ -30,7 +30,7 @@ import { carePlan } from './care.js';
 
 const ACUTE = new Set(['imminent', 'danger']);
 
-export class SteadyStepAgent {
+export class SisFallAgent {
   constructor({ config, journal, model = null } = {}) {
     this.config = mergeConfig(DEFAULT_CONFIG, config);
     this.journal = journal ?? new Journal();

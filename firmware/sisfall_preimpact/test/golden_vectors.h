@@ -3,9 +3,9 @@
 // under the firmware coverage set. detector_host_test.c must match within 1 point.
 #pragma once
 
-#define SS_GOLDEN_COUNT 66
+#define SF_GOLDEN_COUNT 66
 
-static const float SS_GOLDEN_INPUT[SS_GOLDEN_COUNT][4] = {
+static const float SF_GOLDEN_INPUT[SF_GOLDEN_COUNT][4] = {
   { 14.3269f, 2.2837f, 0.7350f, 0.2317f },
   { 2.9605f, 2.1395f, 0.4332f, 0.0133f },
   { 4.1270f, 2.4598f, 1.1674f, 0.1328f },
@@ -74,4 +74,4 @@ static const float SS_GOLDEN_INPUT[SS_GOLDEN_COUNT][4] = {
   { 60.0000f, 2.5000f, 1.2000f, 0.2500f }
 };
 
-static const int SS_GOLDEN_EXPECTED[SS_GOLDEN_COUNT] = { 55, 39, 53, 59, 71, 32, 62, 29, 46, 68, 40, 39, 60, 55, 21, 68, 80, 78, 82, 37, 15, 63, 39, 74, 44, 26, 81, 57, 57, 73, 63, 74, 78, 65, 5, 26, 38, 51, 49, 47, 57, 56, 44, 74, 39, 26, 68, 35, 56, 9, 51, 42, 60, 82, 7, 81, 30, 77, 64, 100, 74, 68, 83, 32, 0, 100 };
+static const int SF_GOLDEN_EXPECTED[SF_GOLDEN_COUNT] = { 55, 39, 53, 59, 71, 32, 62, 29, 46, 68, 40, 39, 60, 55, 21, 68, 80, 78, 82, 37, 15, 63, 39, 74, 44, 26, 81, 57, 57, 73, 63, 74, 78, 65, 5, 26, 38, 51, 49, 47, 57, 56, 44, 74, 39, 26, 68, 35, 56, 9, 51, 42, 60, 82, 7, 81, 30, 77, 64, 100, 74, 68, 83, 32, 0, 100 };

@@ -1,4 +1,4 @@
-# SteadyStep pre-impact band (M4)
+# SisFall pre-impact band (M4)
 
 ESP32-C3 + MPU6050 wearable that runs the SAME detection pipeline as the web
 agent, on-device, with local haptics. It also exposes the accelerometer stream
@@ -42,17 +42,17 @@ arduino-cli upload  --fqbn esp32:esp32:esp32c3 -p /dev/ttyUSB0 .
 
 Note: the sketch targets the Arduino-ESP32 **core 2.x** LEDC API
 (`ledcSetup`/`ledcAttachPin`). On core 3.x, replace those two calls with
-`ledcAttach(SS_BUZZER_PIN, 2000, 8)`.
+`ledcAttach(SF_BUZZER_PIN, 2000, 8)`.
 
 ## Manual hardware checklist
 
-1. Flash, open the serial monitor at 115200: "SteadyStep band ready".
+1. Flash, open the serial monitor at 115200: "SisFall band ready".
 2. Hold still ~1 s (upright reference capture). Buzzer silent; serial quiet.
 3. Tilt the board forward past ~50° and hold: serial prints `EVT state=2` (then
    `3`), buzzer pulses fast then goes continuous.
 4. Straighten up: state returns to `0`, buzzer silent.
 5. Chrome (desktop or Android): open the web UI, press **Connect BLE band**,
-   pick "SteadyStep Band". The live badge shows `BLE · ~50 Hz`; tilt to move
+   pick "SisFall Band". The live badge shows `BLE · ~50 Hz`; tilt to move
    the on-screen "Body alignment".
 6. Walk 60 s with the band on the chest: no false alarms (state stays 0).
 7. Battery/thermal sanity: 10 min run, board stays warm-not-hot; note current
