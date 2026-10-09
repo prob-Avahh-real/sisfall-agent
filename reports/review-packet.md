@@ -32,11 +32,9 @@ would need to judge, plus current scenario metrics.
 
 ## Symptom model (`config.symptoms`)
 
-- **头晕** — half-life 10 min, effective-score boost 25 (cap 35), forecast horizon ×1.5
+- **起身发晕** — half-life 10 min, effective-score boost 25 (cap 35), forecast horizon ×1.5
 - **疲劳** — half-life 60 min, effective-score boost 12 (cap 35), forecast horizon ×1.25
 - **睡眠不足** — half-life 360 min, effective-score boost 8 (cap 35), forecast horizon ×1.1
-- **焦虑** — half-life 30 min, effective-score boost 8 (cap 35), forecast horizon ×1.1
-- **疼痛** — half-life 60 min, effective-score boost 10 (cap 35), forecast horizon ×1.1
 - **药效减退** — half-life 120 min, effective-score boost 15 (cap 35), forecast horizon ×1.3
 - Stage floors: dizziness ≥ 0.6 ⇒ stage ≥ 2; any ≥ 0.5 ⇒ stage ≥ 1
 

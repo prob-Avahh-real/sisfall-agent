@@ -5,7 +5,7 @@ import { poseObservation } from './sources/pose.js';
 import { runScenario, interleave, SCENARIOS } from './sources/sim.js';
 import { DevicemotionSource, requestMotionPermission } from './sources/devicemotion.js';
 import { BleImuSource } from './sources/web-bluetooth.js';
-import { matchVoiceCommand, isScheduleDue, dayKey } from './core/training.js';
+import { matchVoiceCommand, isScheduleDue, isDoseDue, dayKey } from './core/training.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -20,6 +20,7 @@ const ui = {
   trainingNow: $('trainingNow'), trainExercise: $('trainExercise'), trainRemain: $('trainRemain'),
   trainProgress: $('trainProgress'), trainCue: $('trainCue'),
   scheduleOn: $('scheduleOn'), scheduleTime: $('scheduleTime'), scheduleState: $('scheduleState'),
+  medOn: $('medOn'), medTime1: $('medTime1'), medTime2: $('medTime2'), medState: $('medState'),
   careLabel: $('careLabel'), careAdvice: $('careAdvice'), chips: $('checkinChips'),
 };
 
@@ -460,10 +461,14 @@ let trainTicker = null;
 let trainClock = null;
 let speechOn = true;
 let schedule = null;
+let medication = null;
 let lastScheduleFired = null;
+let doseFired = {};
 
 const SCHEDULE_KEY = 'sisfall.trainingSchedule';
 const FIRED_KEY = 'sisfall.trainingFiredDay';
+const MED_KEY = 'sisfall.medicationSchedule';
+const DOSE_FIRED_KEY = 'sisfall.doseFired';
 
 function speak(text) {
   if (!speechOn || typeof speechSynthesis === 'undefined') return;
@@ -602,18 +607,30 @@ function loadSchedule() {
   try {
     schedule = JSON.parse(localStorage.getItem(SCHEDULE_KEY) ?? 'null') ?? { ...DEFAULT_CONFIG.training.schedule };
     lastScheduleFired = localStorage.getItem(FIRED_KEY);
+    medication = JSON.parse(localStorage.getItem(MED_KEY) ?? 'null') ?? { ...DEFAULT_CONFIG.training.medication };
+    doseFired = JSON.parse(localStorage.getItem(DOSE_FIRED_KEY) ?? 'null') ?? {};
   } catch {
     schedule = { ...DEFAULT_CONFIG.training.schedule };
+    medication = { ...DEFAULT_CONFIG.training.medication };
+    doseFired = {};
   }
   ui.scheduleOn.checked = Boolean(schedule.enabled);
   ui.scheduleTime.value = schedule.time ?? '09:00';
+  ui.medOn.checked = Boolean(medication.enabled);
+  ui.medTime1.value = medication.times?.[0] ?? '08:00';
+  ui.medTime2.value = medication.times?.[1] ?? '20:00';
   renderScheduleState();
 }
 
 function saveSchedule() {
   schedule = { enabled: ui.scheduleOn.checked, time: ui.scheduleTime.value || '09:00' };
+  medication = {
+    enabled: ui.medOn.checked,
+    times: [ui.medTime1.value || '08:00', ui.medTime2.value || '20:00'],
+  };
   try {
     localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
+    localStorage.setItem(MED_KEY, JSON.stringify(medication));
   } catch {
     /* 隐私模式下可能不可用，内存态照常工作 */
   }
@@ -624,24 +641,40 @@ function renderScheduleState() {
   ui.scheduleState.textContent = schedule?.enabled
     ? `每天 ${schedule.time}${agent ? '' : '（需先启动监测）'}`
     : '未启用';
+  ui.medState.textContent = medication?.enabled ? `每天 ${medication.times.join(' / ')}` : '未启用';
 }
 
 function scheduleWatch() {
-  if (!schedule?.enabled) return;
-  if (agent?.training.active) return;
-  if (!isScheduleDue(schedule, new Date(), lastScheduleFired)) return;
-  lastScheduleFired = dayKey(new Date());
-  try {
-    localStorage.setItem(FIRED_KEY, lastScheduleFired);
-  } catch {
-    /* 同上 */
+  if (schedule?.enabled && !agent?.training.active && isScheduleDue(schedule, new Date(), lastScheduleFired)) {
+    lastScheduleFired = dayKey(new Date());
+    try {
+      localStorage.setItem(FIRED_KEY, lastScheduleFired);
+    } catch {
+      /* 同上 */
+    }
+    showToast(`该做康复训练了（每天 ${schedule.time}）。点击“开始训练”。`);
+    speak('该做康复训练了。请点击开始训练。');
   }
-  showToast(`该做康复训练了（每天 ${schedule.time}）。点击“开始训练”。`);
-  speak('该做康复训练了。请点击开始训练。');
+  if (medication?.enabled) {
+    const dueTime = isDoseDue(medication.times, new Date(), doseFired);
+    if (dueTime) {
+      doseFired[`${dayKey(new Date())}:${dueTime}`] = true;
+      try {
+        localStorage.setItem(DOSE_FIRED_KEY, JSON.stringify(doseFired));
+      } catch {
+        /* 同上 */
+      }
+      showToast(`服药时间提醒（${dueTime}）——请遵医嘱服用。`);
+      speak('服药时间到了，请遵医嘱。');
+    }
+  }
 }
 
 ui.scheduleOn.onchange = saveSchedule;
 ui.scheduleTime.onchange = saveSchedule;
+ui.medOn.onchange = saveSchedule;
+ui.medTime1.onchange = saveSchedule;
+ui.medTime2.onchange = saveSchedule;
 setInterval(scheduleWatch, 30000);
 
 loadSchedule();

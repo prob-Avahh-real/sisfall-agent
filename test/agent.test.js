@@ -101,7 +101,7 @@ test('dizziness check-in fuses into risk; identical walk stays silent without it
     .byType('action')
     .filter((a) => (a.reason ?? '').includes('症状背景'));
   assert.ok(symptomActions.length >= 1);
-  assert.ok(/头晕/.test(symptomActions[0].text));
+  assert.ok(/发晕/.test(symptomActions[0].text));
 
   // Check-in journaled; staging applies the dizziness floor.
   assert.equal(withSymptoms.agent.journal.byType('checkin').length, 1);

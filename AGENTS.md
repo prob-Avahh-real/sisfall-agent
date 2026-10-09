@@ -5,9 +5,12 @@ applies on top; this file records purpose, targets, and invariants specific here
 
 ## Purpose
 
-Fall-prevention agent: predicts dangerous postures from movement data (camera
-pose / IMU), fuses non-motion symptom check-ins, stages risk longitudinally, and
-emits stage-matched care advice. Prototype, not a medical device.
+Fall-prevention agent scoped to Parkinson's disease (PD): predicts dangerous
+postures from movement data (camera pose / IMU), fuses non-motion symptom
+check-ins, stages risk longitudinally, and emits stage-matched care advice.
+The scope contract is `core/pd-profile.js` (patient/agent action minimal sets +
+boundaries); `test/pd-scope.test.js` enforces it, including the
+`FORBIDDEN_TERMS` scan on user-facing text. Prototype, not a medical device.
 Naming: the project name (SisFall) is independent of the external SisFall
 dataset; dataset-facing paths (`tools/sisfall.js`, `data/sisfall/`, the
 `--sisfall` flag) keep the dataset's name — do not rename those.
@@ -78,6 +81,11 @@ node --test --experimental-test-coverage   # coverage snapshot
 - **Training only dampens caution**: `config.training.dampenCaution` may
   suppress *caution*-level cues during a session (journaled as `note`);
   imminent/danger alarms are never suppressed. Keep it that way.
+- **PD scope contract**: every user-facing feature must map to the sets in
+  `core/pd-profile.js`. User-visible strings must not contain `FORBIDDEN_TERMS`
+  (诊断/处方/剂量/治愈/...); pd-scope.test.js enforces. Training actions must
+  carry an `evidence` field; the medication reminder is a plain time clock —
+  never drug names, doses, or adjustments.
 
 ## Where to change what
 

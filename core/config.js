@@ -125,21 +125,22 @@ export const DEFAULT_CONFIG = {
     boostCap: 35,            // max points added to the effective score
     labelBoostFloor: 5,      // boost that relabels a caution as symptom-driven
     cautionThreshold: 30,    // caution entry score while a symptom is active (vs 42 normally)
-    halfLifeSec: { dizziness: 600, fatigue: 3600, sleepDebt: 21600, anxiety: 1800, pain: 3600, medicationOff: 7200 },
-    riskBoost: { dizziness: 25, fatigue: 12, sleepDebt: 8, anxiety: 8, pain: 10, medicationOff: 15 },
+    halfLifeSec: { dizziness: 600, fatigue: 3600, sleepDebt: 21600, medicationOff: 7200 },
+    riskBoost: { dizziness: 25, fatigue: 12, sleepDebt: 8, medicationOff: 15 },
     // Forecast horizons multiply by this while the symptom is active (> 1 = warn earlier).
-    horizonScale: { dizziness: 1.5, fatigue: 1.25, sleepDebt: 1.1, anxiety: 1.1, pain: 1.1, medicationOff: 1.3 },
+    horizonScale: { dizziness: 1.5, fatigue: 1.25, sleepDebt: 1.1, medicationOff: 1.3 },
   },
 
   training: {
-    // 康复训练（定时提醒 + 语音唤出）。状态机与动作库在 core/training.js；
-    // 定时器与 Web Speech API 在 UI 层。训练中暂缓"注意"级视觉提示
-    // （原样记入 journal 为 note），预警/危险级告警绝不降级。
-    exercisesPerSession: 4,
+    // 康复训练（定时提醒 + 语音唤出）。动作库是 PD 最小集（core/training.js，
+    // 每项带 evidence）。训练中暂缓"注意"级视觉提示（journal 记 note），
+    // 预警/危险级告警绝不降级。服药提醒只是时间闹钟——见 pd-profile 边界。
+    exercisesPerSession: 5,
     introSec: 3,
     restSec: 8,
     dampenCaution: true,
-    schedule: { enabled: false, time: '09:00' }, // 默认计划，UI 可改并持久化
+    schedule: { enabled: false, time: '09:00' }, // 训练默认计划，UI 可改并持久化
+    medication: { enabled: false, times: ['08:00', '20:00'] }, // 仅时间提醒；遵医嘱设置
   },
 
   staging: {

@@ -29,7 +29,7 @@ export function createPolicyState(now = 0) {
 
 function instructionFor(drivers = [], forecast = {}, cause = '', symptoms = null) {
   if (symptoms && symptoms.top === 'dizziness' && cause !== 'deviation') {
-    return '您报告了头晕。请立即坐下并扶稳。';
+    return '您报告了起身发晕。请先坐稳，再缓慢站起。';
   }
   if (cause === 'symptom') return `您报告了${symptoms?.topLabel ?? '症状'}。请放慢速度，稳住身体。`;
   if (cause === 'deviation') return '您的步态与平时不同。请暂停片刻，稳住身体。';

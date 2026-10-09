@@ -81,7 +81,7 @@ test('symptom-boosted caution names the symptom', () => {
   const out = decide(createPolicyState(0), { risk: riskAt(45, 'caution'), symptoms });
   assert.equal(out.state, 'caution');
   assert.ok(out.actions.some((a) => (a.reason ?? '').includes('症状背景')));
-  assert.ok(out.actions.some((a) => a.text.includes('头晕')));
+  assert.ok(out.actions.some((a) => a.text.includes('发晕')));
 });
 
 test('unusual-for-you deviation nudges at a modest absolute score', () => {

@@ -1,5 +1,6 @@
-// Non-motion symptom domain: self-reported check-ins (dizziness, fatigue,
-// poor sleep, anxiety, pain) plus medication state.
+// 症状签到域（PD 最小集，core/pd-profile.js）：起身发晕（体位相关）、
+// 疲劳、睡眠不足、药效减退——只收会直接改变"当下行动安全"的因素；
+// 焦虑、疼痛等纳入临床随访（超出本应用行为边界）。
 //
 // These are NOT features of a single frame — they are context that persists
 // and decays in time. A symptom reported at severity s fades exponentially
@@ -16,14 +17,12 @@
 
 import { DEFAULT_CONFIG } from './config.js';
 
-export const SYMPTOM_KEYS = ['dizziness', 'fatigue', 'sleepDebt', 'anxiety', 'pain', 'medicationOff'];
+export const SYMPTOM_KEYS = ['dizziness', 'fatigue', 'sleepDebt', 'medicationOff'];
 
 export const SYMPTOM_LABELS = {
-  dizziness: '头晕',
+  dizziness: '起身发晕',
   fatigue: '疲劳',
   sleepDebt: '睡眠不足',
-  anxiety: '焦虑',
-  pain: '疼痛',
   medicationOff: '药效减退',
 };
 
@@ -33,15 +32,11 @@ export function adviceFor(symptom, windowRemainingSec = 0) {
     windowRemainingSec > 60 ? `（高度关注约 ${Math.round(windowRemainingSec / 60)} 分钟）` : '';
   switch (symptom) {
     case 'dizziness':
-      return `请立即坐下并扶稳。症状持续期间 SisFall 会更早预警。${windowNote}`;
+      return `起身发晕时先坐稳、再缓慢站起；症状持续期间智能体会更早预警。若反复出现，请告知医生。${windowNote}`;
     case 'fatigue':
       return `建议先休息，再继续行走。${windowNote}`;
     case 'sleepDebt':
       return `睡眠不足会提高当日跌倒风险。路线与步速都留出余量。${windowNote}`;
-    case 'anxiety':
-      return `放慢脚步、加宽站距；智能体在一段时间内会更敏感。${windowNote}`;
-    case 'pain':
-      return `请小心移动——当前阈值已临时收紧。${windowNote}`;
     case 'medicationOff':
       return `药效减退可能增加症状风险。下次服药前请放慢节奏。${windowNote}`;
     default:

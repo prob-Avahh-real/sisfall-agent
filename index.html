@@ -50,11 +50,9 @@
 
         <h3>报告症状</h3>
         <div class="chips" id="checkinChips">
-          <button data-symptom="dizziness" aria-label="报告头晕">头晕</button>
+          <button data-symptom="dizziness" aria-label="报告起身发晕">起身发晕</button>
           <button data-symptom="fatigue" aria-label="报告疲劳">疲劳</button>
           <button data-symptom="sleepDebt" aria-label="报告睡眠不足">睡眠不足</button>
-          <button data-symptom="anxiety" aria-label="报告焦虑">焦虑</button>
-          <button data-symptom="pain" aria-label="报告疼痛">疼痛</button>
           <button data-symptom="medicationOff" aria-label="报告药效减退">药效减退</button>
         </div>
 
@@ -75,10 +73,17 @@
           <button class="secondary" id="voiceBtn">语音唤出：关</button>
         </div>
         <div class="schedule-row">
-          <label><input type="checkbox" id="scheduleOn" /> 定时提醒</label>
+          <label><input type="checkbox" id="scheduleOn" /> 训练提醒</label>
           <input type="time" id="scheduleTime" value="09:00" />
           <span class="schedule-state" id="scheduleState"></span>
         </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" id="medOn" /> 服药提醒（遵医嘱设置）</label>
+          <input type="time" id="medTime1" value="08:00" />
+          <input type="time" id="medTime2" value="20:00" />
+          <span class="schedule-state" id="medState"></span>
+        </div>
+        <p class="train-cue">训练动作为活动练习，不构成治疗方案。</p>
 
         <div class="actions">
           <button class="primary" id="cameraBtn">启动相机分析</button>
@@ -99,7 +104,7 @@
       </aside>
     </section>
 
-    <p class="disclaimer">原型演示，非医疗器械，不提供急救服务；可能会漏报或误报。请保持常规防跌倒措施。</p>
+    <p class="disclaimer">原型应用，非医疗器械：不做诊断、不涉及用药调整、不替代急救；可能漏报或误报。请遵医嘱并保持常规防跌倒措施。</p>
   </main>
   <script type="module" src="app.js"></script>
 </body>

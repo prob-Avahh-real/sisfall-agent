@@ -61,11 +61,9 @@ export const STAGE_DEFINITIONS = [
 
 // Symptom-driven additions appended to whatever the stage plan says.
 const SYMPTOM_ADDONS = {
-  dizziness: { kind: 'activity', text: '头晕期间——起身放慢，变换体位之间稍作停顿。' },
+  dizziness: { kind: 'activity', text: '起身发晕期间——变换体位放慢，站立前先坐稳片刻。' },
   fatigue: { kind: 'activity', text: '疲劳期间——在感到需要之前安排休息。' },
   sleepDebt: { kind: 'activity', text: '睡眠不足会提高当日风险——步行尽量短而熟悉。' },
-  anxiety: { kind: 'monitoring', text: '焦虑期间——放慢步频、加宽站距有助于稳定。' },
-  pain: { kind: 'activity', text: '疼痛期间——转身时避免让患侧过度受力。' },
   medicationOff: { kind: 'clinical', text: '药效可能减退——请记录不稳定的时间点，供医生参考。' },
 };
 

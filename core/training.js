@@ -1,29 +1,35 @@
-// 康复训练：动作库 + 会话状态机 + 定时计划纯函数 + 语音命令匹配。
+// 康复训练：动作库 + 会话状态机 + 定时纯函数 + 语音命令匹配。
+//
+// 动作库是 PD 最小集（见 core/pd-profile.js）：围绕 患者行动最小集 的四类
+// 行动（行走/转身/坐站转移/站立重心），每个动作带 evidence 字段（依据），
+// 理念来自 NICE NG71 的 PD 特异性物理治疗、MDS 循证综述的 cueing 策略与
+// LSVT-BIG 的幅度驱动理念。动作是安全的活动练习，不是治疗方案。
 //
 // 设计要点
-// - 训练会**故意制造姿态波动**（单腿站立、重心转移），所以 agent 在训练
+// - 训练会**故意制造姿态波动**（大步行进、重心转移），所以 agent 在训练
 //   模式下暂缓"注意"级视觉提示（记录为 note，供审计），但预警/危险级
 //   告警绝不降级——安全边界不动（config.training.dampenCaution）。
-// - 动作按跌倒风险等级取库：0-1 级以站立训练为主，2-3 级以坐位/扶稳为主。
+// - 动作按阶段取库：0-1 级以站立训练为主，2 级以上以坐位/扶稳为主。
 // - 定时与语音是 UI 层能力（浏览器定时器 / Web Speech API），这里只放
-//   可测试的纯逻辑：时间轴状态机、isScheduleDue、matchVoiceCommand。
-// - 真实系统级提醒（页面关闭仍生效）需要 Capacitor 通知权限，属后续里程碑。
+//   可测试的纯逻辑：时间轴状态机、isScheduleDue、isDoseDue、语音匹配。
 
 import { DEFAULT_CONFIG } from './config.js';
 
 export const TRAINING_LIBRARY = {
   light: [
-    { id: 'march', name: '原地踏步', seconds: 60, kind: '热身', cue: '扶好椅背，缓慢抬膝踏步。', safety: '手扶稳定支撑' },
-    { id: 'tandem', name: '脚跟对脚尖站立', seconds: 30, kind: '平衡', cue: '脚跟贴脚尖站直，目视前方。', safety: '靠墙或扶椅' },
-    { id: 'single-leg', name: '单腿站立', seconds: 20, kind: '平衡', cue: '扶稳后抬起一只脚，保持均匀呼吸。', safety: '全程扶稳' },
-    { id: 'sit-stand', name: '坐到站', seconds: 40, kind: '力量', cue: '缓慢起立再坐下，膝盖对准脚尖。', safety: '选择稳定、无轮子的椅子' },
-    { id: 'calf-raise', name: '提踵', seconds: 30, kind: '力量', cue: '踮起脚尖停一秒，再缓慢落下。', safety: '手扶支撑' },
+    { id: 'big-steps', name: '大步行进', seconds: 45, kind: '步态', cue: '迈大步，像跨过地上的大石块；双臂自然摆动。', safety: '选择宽阔通道，手边有支撑', evidence: 'LSVT-BIG 幅度驱动理念：大幅度动作训练' },
+    { id: 'metronome-walk', name: '节拍行走', seconds: 45, kind: '步态', cue: '跟着节拍左右迈步；可以先原地起步再前进。', safety: '扶稳或靠墙，地面平整', evidence: '节律听觉提示（cueing）改善 PD 步速与步幅' },
+    { id: 'turn-practice', name: '大弧转身', seconds: 30, kind: '转移', cue: '转身时走大弧线，先迈步再转，不要原地硬转。', safety: '手扶稳定支撑', evidence: '转身是 PD 冻结与跌倒的高发场景' },
+    { id: 'sit-stand', name: '坐站转移', seconds: 40, kind: '转移', cue: '起身前先让鼻尖越过膝盖，缓慢起立再坐下。', safety: '选择稳定、无轮子的椅子', evidence: 'PD 特异性物理治疗核心：转移训练' },
+    { id: 'freeze-plan', name: '冻结应对演练', seconds: 30, kind: '策略', cue: '练习口诀：先停下站稳，想好一个大目标，数一二三迈出去。', safety: '练习时全程扶稳', evidence: '冻结的分步策略：cueing + 先迈步再转身' },
+    { id: 'weight-shift', name: '重心转移', seconds: 40, kind: '平衡', cue: '左右缓慢转移重心，感受双脚承重的变化。', safety: '手扶稳定支撑', evidence: '平衡训练用于姿势不稳（含太极理念）' },
   ],
   supported: [
-    { id: 'seated-march', name: '坐位抬腿踏步', seconds: 45, kind: '热身', cue: '坐在椅上交替抬腿踏步。', safety: '椅子稳定、靠近扶手' },
-    { id: 'seated-shift', name: '坐位重心转移', seconds: 40, kind: '平衡', cue: '左右缓慢转移重心，动作放慢。', safety: '必要时扶住扶手' },
-    { id: 'sit-stand', name: '扶稳坐到站', seconds: 40, kind: '力量', cue: '双手扶稳，缓慢起立再坐下。', safety: '全程扶稳' },
-    { id: 'side-step', name: '扶椅侧向迈步', seconds: 40, kind: '步态', cue: '扶住椅背，向侧方缓慢迈步。', safety: '扶稳、地面干燥' },
+    { id: 'seated-big-arms', name: '坐位大幅摆臂', seconds: 40, kind: '热身', cue: '坐在椅上，向前后大幅摆动手臂，幅度尽量大。', safety: '椅子稳定，远离桌角', evidence: 'LSVT-BIG 幅度维持理念' },
+    { id: 'seated-march', name: '坐位踏步', seconds: 40, kind: '步态', cue: '坐姿交替抬腿踏步，抬得稍高一些。', safety: '靠近扶手', evidence: '坐位步态准备训练' },
+    { id: 'seated-weight-shift', name: '坐位重心转移', seconds: 40, kind: '平衡', cue: '缓慢左右转移重心，动作保持从容。', safety: '必要时扶住扶手', evidence: '重心控制训练' },
+    { id: 'supported-sit-stand', name: '扶稳坐站', seconds: 40, kind: '转移', cue: '双手扶稳，鼻尖越过膝盖，缓慢起立再坐下。', safety: '全程扶稳', evidence: '转移训练（带支持条件）' },
+    { id: 'freeze-plan', name: '冻结应对演练', seconds: 30, kind: '策略', cue: '练习口诀：先停下站稳，想好一个大目标，数一二三迈出去。', safety: '练习时扶稳', evidence: '冻结的分步策略：cueing + 先迈步再转身' },
   ],
 };
 
@@ -117,6 +123,24 @@ export function isScheduleDue(schedule, date, lastFiredKey = null) {
   const nowMin = date.getHours() * 60 + date.getMinutes();
   if (nowMin < target || nowMin > target + 10) return false;
   return lastFiredKey !== dayKey(date);
+}
+
+// ---------------------------------------------------------------------------
+// 服药提醒（最小集）：每日至多几个时间点的**时间闹钟**——不含药名、剂量
+// 与调整建议（那是医嘱，见 core/pd-profile.js 的行为边界）。返回到点且
+// 当天尚未提醒过的第一个时间点，否则 null。
+export function isDoseDue(times = [], date, lastFired = {}) {
+  const key = dayKey(date);
+  const nowMin = date.getHours() * 60 + date.getMinutes();
+  for (const time of times) {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(String(time ?? ''));
+    if (!match) continue;
+    const target = Number(match[1]) * 60 + Number(match[2]);
+    if (nowMin < target || nowMin > target + 10) continue;
+    if (lastFired[`${key}:${time}`]) continue;
+    return time;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

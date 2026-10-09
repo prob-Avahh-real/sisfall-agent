@@ -39,9 +39,9 @@ test('boost composes, caps, and dizziness extends the horizon', () => {
 
 test('cleared symptoms leave the active set', () => {
   const s = new SymptomState();
-  s.checkin({ t: 0, symptom: 'anxiety', severity: 0.5 });
+  s.checkin({ t: 0, symptom: 'dizziness', severity: 0.5 });
   assert.equal(s.activeKeys(0).size, 1);
-  // anxiety half-life 1800s: 0.5 * 2^(-6000/1800) ≈ 0.05 < minLevel
+  // 起身发晕半衰期 600s：0.5 * 2^(-6000/600) ≈ 0.0005 < minLevel
   assert.equal(s.activeKeys(6000).size, 0);
 });
 

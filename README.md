@@ -220,6 +220,36 @@ Verification boundaries, stated plainly:
 - Caregiver notification is a follow-up: events are logged over Serial; nothing
   is transmitted off-device yet.
 
+## PD scope & boundaries (指南对齐)
+
+This agent is scoped to Parkinson's disease (PD) by design; every feature maps
+to the **minimal action set** in `core/pd-profile.js` — the single source of
+truth, enforced by `test/pd-scope.test.js`.
+
+Guideline anchors (paraphrased): NICE NG71 — early referral to PD-experienced
+physiotherapy and PD-specific physiotherapy for balance/motor problems
+(1.7.2/1.7.3), plus the linked falls/vitamin D guidance; MDS physiotherapy EBM
+review (Keus et al., 2015) — gait, balance, transfers, cueing for freezing;
+AAN — exercise/physiotherapy as low-risk management options; 《中国帕金森病治疗
+指南（第四版, 2020）》— 康复与运动治疗是全程管理的组成部分.
+
+- **Patient action minimal set**: walking, turning, sit-to-stand, stance and
+  weight transfer. The agent observes and nudges around these four, nothing else.
+- **Agent action minimal set**: assess & forecast, cueing prompts, staged
+  training guidance, medication *time* reminders, session journal.
+- **Boundaries (never crossed)**: no diagnosis (no H&Y/UPDRS scoring), no drug
+  names/doses/changes, no emergency substitution (it prompts you to call for
+  help; it never auto-calls), no disease-progression claims, and training is
+  activity practice — not a treatment plan. All user-facing strings are scanned
+  against `FORBIDDEN_TERMS` in CI.
+- **Pruned to fit**: symptom check-ins reduced to the four that change immediate
+  action safety (起身发晕/疲劳/睡眠不足/药效减退); anxiety, pain and similar
+  belong to clinical follow-up. Generic balance exercises were replaced by
+  PD-specific ones (LSVT-BIG-style big movements, metronome/rhythmic cueing,
+  big-arc turning, freeze-response drill), each carrying an `evidence` field.
+- **Added**: medication time reminders (a plain daily clock, set per your
+  clinician's schedule) and the freeze-response drill.
+
 ## Environment inference & active inquiry (2026-10)
 
 The web UI has no "obstacle / slippery floor" checkbox anymore. Instead:
@@ -246,6 +276,9 @@ The web UI has no "obstacle / slippery floor" checkbox anymore. Instead:
   localStorage). While the page is open a reminder fires once per day within a
   10-minute window. System-level reminders (page closed) need the Capacitor
   milestone — prototype boundary, stated rather than faked.
+- **Medication time reminders**: up to two daily times — a plain time clock set
+  per your clinician's schedule. No drug names, no doses, no adjustments (see
+  the PD boundaries above).
 - **Voice**: Web Speech API. `SpeechSynthesis` reads cues (zh-CN); recognition
   (Chrome/Edge) matches "开始训练 / 停止训练"-style commands via keyword rules —
   no cloud NLU inside the app, graceful fallback to buttons when unavailable.
