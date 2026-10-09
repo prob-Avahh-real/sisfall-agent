@@ -17,19 +17,19 @@ import { DEFAULT_CONFIG } from './config.js';
 
 export const TRAINING_LIBRARY = {
   light: [
-    { id: 'big-steps', name: '大步行进', seconds: 45, kind: '步态', cue: '迈大步，像跨过地上的大石块；双臂自然摆动。', safety: '选择宽阔通道，手边有支撑', evidence: 'LSVT-BIG 幅度驱动理念：大幅度动作训练' },
-    { id: 'metronome-walk', name: '节拍行走', seconds: 45, kind: '步态', cue: '跟着节拍左右迈步；可以先原地起步再前进。', safety: '扶稳或靠墙，地面平整', evidence: '节律听觉提示（cueing）改善 PD 步速与步幅' },
-    { id: 'turn-practice', name: '大弧转身', seconds: 30, kind: '转移', cue: '转身时走大弧线，先迈步再转，不要原地硬转。', safety: '手扶稳定支撑', evidence: '转身是 PD 冻结与跌倒的高发场景' },
+    { id: 'big-steps', name: '大步行进', seconds: 45, kind: '步态', bpm: 90, cue: '迈大步，像跨过地上的大石块；双臂自然摆动。', safety: '选择宽阔通道，手边有支撑', evidence: 'LSVT-BIG 幅度驱动理念：大幅度动作训练' },
+    { id: 'metronome-walk', name: '节拍行走', seconds: 45, kind: '步态', bpm: 100, cue: '跟着节拍左右迈步；可以先原地起步再前进。', safety: '扶稳或靠墙，地面平整', evidence: '节律听觉提示（cueing）改善 PD 步速与步幅' },
+    { id: 'turn-practice', name: '大弧转身', seconds: 30, kind: '转移', bpm: 80, cue: '转身时走大弧线，先迈步再转，不要原地硬转。', safety: '手扶稳定支撑', evidence: '转身是 PD 冻结与跌倒的高发场景' },
     { id: 'sit-stand', name: '坐站转移', seconds: 40, kind: '转移', cue: '起身前先让鼻尖越过膝盖，缓慢起立再坐下。', safety: '选择稳定、无轮子的椅子', evidence: 'PD 特异性物理治疗核心：转移训练' },
-    { id: 'freeze-plan', name: '冻结应对演练', seconds: 30, kind: '策略', cue: '练习口诀：先停下站稳，想好一个大目标，数一二三迈出去。', safety: '练习时全程扶稳', evidence: '冻结的分步策略：cueing + 先迈步再转身' },
+    { id: 'freeze-plan', name: '冻结应对演练', seconds: 30, kind: '策略', bpm: 70, cue: '练习口诀：先停下站稳，想好一个大目标，数一二三迈出去。', safety: '练习时全程扶稳', evidence: '冻结的分步策略：cueing + 先迈步再转身' },
     { id: 'weight-shift', name: '重心转移', seconds: 40, kind: '平衡', cue: '左右缓慢转移重心，感受双脚承重的变化。', safety: '手扶稳定支撑', evidence: '平衡训练用于姿势不稳（含太极理念）' },
   ],
   supported: [
     { id: 'seated-big-arms', name: '坐位大幅摆臂', seconds: 40, kind: '热身', cue: '坐在椅上，向前后大幅摆动手臂，幅度尽量大。', safety: '椅子稳定，远离桌角', evidence: 'LSVT-BIG 幅度维持理念' },
-    { id: 'seated-march', name: '坐位踏步', seconds: 40, kind: '步态', cue: '坐姿交替抬腿踏步，抬得稍高一些。', safety: '靠近扶手', evidence: '坐位步态准备训练' },
+    { id: 'seated-march', name: '坐位踏步', seconds: 40, kind: '步态', bpm: 90, cue: '坐姿交替抬腿踏步，抬得稍高一些。', safety: '靠近扶手', evidence: '坐位步态准备训练' },
     { id: 'seated-weight-shift', name: '坐位重心转移', seconds: 40, kind: '平衡', cue: '缓慢左右转移重心，动作保持从容。', safety: '必要时扶住扶手', evidence: '重心控制训练' },
     { id: 'supported-sit-stand', name: '扶稳坐站', seconds: 40, kind: '转移', cue: '双手扶稳，鼻尖越过膝盖，缓慢起立再坐下。', safety: '全程扶稳', evidence: '转移训练（带支持条件）' },
-    { id: 'freeze-plan', name: '冻结应对演练', seconds: 30, kind: '策略', cue: '练习口诀：先停下站稳，想好一个大目标，数一二三迈出去。', safety: '练习时扶稳', evidence: '冻结的分步策略：cueing + 先迈步再转身' },
+    { id: 'freeze-plan', name: '冻结应对演练', seconds: 30, kind: '策略', bpm: 70, cue: '练习口诀：先停下站稳，想好一个大目标，数一二三迈出去。', safety: '练习时扶稳', evidence: '冻结的分步策略：cueing + 先迈步再转身' },
   ],
 };
 

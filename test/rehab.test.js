@@ -10,6 +10,9 @@ test('0-1 级取站立动作库，2 级以上取坐位/扶稳库，全部带依�
   assert.equal(light[0].id, 'big-steps');
   assert.equal(light.length, DEFAULT_CONFIG.training.exercisesPerSession);
   assert.ok(light.every((item) => item.safety && item.evidence));
+  const metronome = light.find((item) => item.id === 'metronome-walk');
+  assert.equal(metronome.bpm, 100, '节拍行走带推荐 BPM');
+  assert.ok(light.filter((item) => item.bpm).length >= 2, '至少两个动作带节拍');
   const supported = planForStage(2, DEFAULT_CONFIG);
   assert.equal(supported[0].id, 'seated-big-arms');
   assert.ok(supported.every((item) => item.safety && item.evidence));

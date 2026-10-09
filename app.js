@@ -6,6 +6,7 @@ import { runScenario, interleave, SCENARIOS } from './sources/sim.js';
 import { DevicemotionSource, requestMotionPermission } from './sources/devicemotion.js';
 import { BleImuSource } from './sources/web-bluetooth.js';
 import { matchVoiceCommand, isScheduleDue, isDoseDue, dayKey } from './core/training.js';
+import { DEFAULT_BPM, clampBpm, breathPhaseAt } from './core/music.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -21,6 +22,7 @@ const ui = {
   trainProgress: $('trainProgress'), trainCue: $('trainCue'),
   scheduleOn: $('scheduleOn'), scheduleTime: $('scheduleTime'), scheduleState: $('scheduleState'),
   medOn: $('medOn'), medTime1: $('medTime1'), medTime2: $('medTime2'), medState: $('medState'),
+  musicOn: $('musicOn'), musicMode: $('musicMode'), musicBpm: $('musicBpm'), musicState: $('musicState'),
   careLabel: $('careLabel'), careAdvice: $('careAdvice'), chips: $('checkinChips'),
 };
 
@@ -526,6 +528,10 @@ function startTraining(source = 'manual') {
     if (current.phase === 'exercise' && current.index !== lastExercise) {
       lastExercise = current.index;
       speak(`${current.exercise.name}。${current.exercise.cue} 注意：${current.exercise.safety}`);
+      // 音乐疗愈联动：节拍模式跟随当前动作的推荐 BPM（如节拍行走 100）
+      if (music.on && music.mode === 'metronome') {
+        music.bpm = clampBpm(current.exercise.bpm ?? music.baseBpm);
+      }
     }
   }, 1000);
 }
@@ -533,6 +539,7 @@ function startTraining(source = 'manual') {
 function endTraining({ completed }) {
   clearInterval(trainTicker);
   trainTicker = null;
+  if (music.on) music.bpm = music.baseBpm; // 训练结束，节拍恢复面板设置
   if (!agent?.training.active) return;
   const t = trainClock ? trainClock() : agent.lastT;
   trainClock = null;
@@ -601,6 +608,132 @@ function setVoice(on) {
 }
 
 ui.voiceBtn.onclick = () => setVoice(!voiceOn);
+
+// --- 音乐疗愈：Web Audio 合成的节拍/呼吸提示（零音频文件、离线可用）--------
+// 节拍用于步态节律提示（RAS 方向）；呼吸引导（4-4-6）为放松辅助。
+// 训练中若当前动作带 bpm（如节拍行走 100），节拍自动采用动作节奏。
+let audioCtx = null;
+const music = { on: false, mode: 'metronome', bpm: DEFAULT_BPM, baseBpm: DEFAULT_BPM, startedAt: 0, nextBeat: 0, lastStageKey: '', ticker: null, render: null };
+const BREATH_STAGE_TEXT = { inhale: '吸气', hold: '屏息', exhale: '呼气' };
+
+function ensureAudio() {
+  if (!audioCtx) {
+    const Impl = window.AudioContext ?? window.webkitAudioContext;
+    if (!Impl) return null;
+    audioCtx = new Impl();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+
+function beatSound(accent = false) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = accent ? 1040 : 880;
+  gain.gain.setValueAtTime(accent ? 0.09 : 0.06, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0008, ctx.currentTime + 0.07);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.08);
+}
+
+function chime(rising) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(rising ? 392 : 660, ctx.currentTime);
+  osc.frequency.linearRampToValueAtTime(rising ? 660 : 392, ctx.currentTime + 0.6);
+  gain.gain.setValueAtTime(0.05, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0008, ctx.currentTime + 0.7);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.75);
+}
+
+function musicTick() {
+  const now = performance.now() / 1000;
+  if (music.mode === 'metronome') {
+    const interval = 60 / music.bpm;
+    let guard = 8;
+    while (music.nextBeat <= now + 0.05 && guard > 0) {
+      const index = Math.round((music.nextBeat - music.startedAt) / interval);
+      beatSound(index % 4 === 0);
+      music.nextBeat += interval;
+      guard -= 1;
+    }
+  } else {
+    const phase = breathPhaseAt(now, { startedAt: music.startedAt });
+    const key = `${phase.cycleIndex}:${phase.stageIndex}`;
+    if (key !== music.lastStageKey) {
+      music.lastStageKey = key;
+      if (phase.stage === 'inhale') chime(true);
+      if (phase.stage === 'exhale') chime(false);
+    }
+  }
+}
+
+function renderMusicState() {
+  if (!music.on) {
+    ui.musicState.textContent = '未开启——节拍用于步态节律提示，呼吸用于放松。';
+    return;
+  }
+  if (music.mode === 'metronome') {
+    ui.musicState.textContent = `节拍提示 · ${music.bpm} BPM（跟随迈步）`;
+  } else {
+    const phase = breathPhaseAt(performance.now() / 1000, { startedAt: music.startedAt });
+    ui.musicState.textContent = `呼吸引导 · ${BREATH_STAGE_TEXT[phase.stage]} ${Math.ceil(phase.remaining)} 秒`;
+  }
+}
+
+function applyMusicSettings() {
+  music.mode = ui.musicMode.value === 'breath' ? 'breath' : 'metronome';
+  music.baseBpm = clampBpm(Number(ui.musicBpm.value));
+  music.bpm = music.baseBpm;
+  ui.musicBpm.disabled = music.mode !== 'metronome';
+  music.startedAt = performance.now() / 1000;
+  music.nextBeat = music.startedAt;
+  music.lastStageKey = '';
+  renderMusicState();
+}
+
+function startMusic() {
+  if (!ensureAudio()) {
+    showToast('此浏览器不支持音频合成（Web Audio），音乐疗愈不可用。');
+    ui.musicOn.checked = false;
+    return;
+  }
+  music.on = true;
+  clearInterval(music.ticker);
+  clearInterval(music.render);
+  music.ticker = setInterval(musicTick, 40);
+  music.render = setInterval(renderMusicState, 500);
+  renderMusicState();
+}
+
+function stopMusic() {
+  music.on = false;
+  clearInterval(music.ticker);
+  clearInterval(music.render);
+  music.ticker = null;
+  music.render = null;
+  renderMusicState();
+}
+
+ui.musicOn.onchange = () => {
+  if (ui.musicOn.checked) {
+    applyMusicSettings();
+    startMusic();
+  } else {
+    stopMusic();
+  }
+};
+ui.musicMode.onchange = applyMusicSettings;
+ui.musicBpm.onchange = applyMusicSettings;
 
 // 定时提醒（页面需保持打开；系统级提醒属后续里程碑——见 README）。
 function loadSchedule() {

@@ -40,7 +40,7 @@ export const PD_PATIENT_ACTIONS = [
 /** agent 行动最小集：允许做且仅允许做的行为。 */
 export const PD_AGENT_ACTIONS = [
   { id: 'assess', name: '姿态风险评估与趋势预测', note: '只描述姿态与趋势，不做分期判定' },
-  { id: 'cue', name: '提示性提醒（放慢、扶稳、节律）', note: '引导性口令（含起身分步、扶稳、节律），不含治疗指令' },
+  { id: 'cue', name: '提示性提醒（放慢、扶稳、节律）', note: '引导性口令（含起身分步、扶稳、节拍/节律提示），不含治疗指令' },
   { id: 'train', name: '循证训练动作引导（按阶段取库）', note: '每个动作带 evidence 字段' },
   { id: 'medication', name: '服药时间提醒', note: '只是时间闹钟；不含药名、剂量与调整' },
   { id: 'journal', name: '会话日志（供复诊参考）', note: '日志是记录，不是诊断结论' },

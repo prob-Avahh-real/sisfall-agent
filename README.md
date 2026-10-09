@@ -284,6 +284,12 @@ The web UI has no "obstacle / slippery floor" checkbox anymore. Instead:
 - **Medication time reminders**: up to two daily times — a plain time clock set
   per your clinician's schedule. No drug names, no doses, no adjustments (see
   the PD boundaries above).
+- **Music therapy module** (音乐疗愈): Web Audio synthesis — zero audio files,
+  works offline. Two modes: 节拍提示 (rhythmic auditory cueing for gait, the
+  RAS direction; BPM 80-120, and during training it auto-follows the exercise's
+  recommended tempo, e.g. 节拍行走 at 100) and 呼吸引导 (4-4-6 breathing for
+  relaxation — an assist, no efficacy claims). Mode copy is covered by the
+  pd-scope compliance scan.
 - **Voice**: Web Speech API. `SpeechSynthesis` reads cues (zh-CN); recognition
   (Chrome/Edge) matches "开始训练 / 停止训练"-style commands via keyword rules —
   no cloud NLU inside the app, graceful fallback to buttons when unavailable.
