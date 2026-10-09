@@ -290,16 +290,20 @@ The web UI has no "obstacle / slippery floor" checkbox anymore. Instead:
   recommended tempo, e.g. 节拍行走 at 100) and 呼吸引导 (4-4-6 breathing for
   relaxation — an assist, no efficacy claims). Mode copy is covered by the
   pd-scope compliance scan.
-- **Baduanjin follow-along with scoring** (八段锦跟练): camera-only; tracks the
-  full-body skeleton and draws motion trails (both wrists + hip midpoint, ~4 s
-  fading). Each of the eight movements scores 0-100 from 2-3 explainable
-  geometric evaluators (e.g. 双手托天理三焦: hands above head / level / torso
-  upright), picked so they are observable from a front camera (「往后瞧」 is
-  scored on torso steadiness, not head turn). The stick figure is tinted per
-  joint (green/amber/grey = on-target/near/off), per-movement averages and the
-  session total land in the journal. Practice feedback, not a medical
-  assessment. During follow-along the agent uses the same "expected movement"
-  semantics as training — caution cues are deferred, imminent/danger never.
+- **Baduanjin follow-along with trajectory scoring** (八段锦跟练): camera-only.
+  Each of the eight movements ships a **preloaded reference trajectory** —
+  keyframe poses (normalized skeleton: hip-mid origin, shoulder-width unit)
+  interpolated with smoothstep — drawn as a blue reference skeleton overlaid on
+  your live skeleton at the same coordinate anchor. Scoring compares the two:
+  per-joint weighted distance in the shared normalized space, with a latency
+  window (±0.15/0.2 progress) so a human's delayed reaction still matches, plus
+  motion trails (wrists + hip, ~4 s fading). Joints tint green/amber/grey by
+  deviation; per-movement averages and the session total land in the journal.
+  The reference is *programmatic sketch motion*, not motion-capture data —
+  stated honestly; the data structure (joint-coordinate frame sequences)
+  accepts real mocap later. Practice feedback, not a medical assessment; the
+  agent keeps the same "expected movement" semantics as training — caution
+  cues deferred, imminent/danger never.
 - **Voice**: Web Speech API. `SpeechSynthesis` reads cues (zh-CN); recognition
   (Chrome/Edge) matches "开始训练 / 停止训练"-style commands via keyword rules —
   no cloud NLU inside the app, graceful fallback to buttons when unavailable.

@@ -1,56 +1,85 @@
-// 八段锦跟练模块（core/baduanjin.js）的测试：结构、几何特征、逐式评分、
-// 时间轴会话与聚合。评分用合成骨骼验证（接口对合成 landmarks 开放）。
+// 八段锦跟练模块（core/baduanjin.js）的测试：标准轨迹、归一化、对比打分、
+// 时滞匹配、时间轴与聚合。通过"把标准姿势渲染为图像 landmarks"来构造
+// 可精确校验的合成输入（数学上可逆，评分必须还原为 100 分）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BADUANJIN_MOVES, BaduanjinSession, extractBaduanjinFeatures, scoreMove, aggregateScores } from '../core/baduanjin.js';
+import {
+  BADUANJIN_MOVES,
+  POSE_LIBRARY,
+  BaduanjinSession,
+  referencePoseAt,
+  normalizeSkeleton,
+  comparePoses,
+  matchScore,
+  aggregateScores,
+} from '../core/baduanjin.js';
 import { DEFAULT_CONFIG } from '../core/config.js';
 
-// 合成骨骼：托天标准姿势（双手举过头、竖直站立）
-function tuotianLandmarks() {
+// 工具：归一化姿势 → 图像 landmarks（hipMid=(0.5,0.6)、肩宽=0.2）
+const SCALE = 0.2;
+const ORIGIN = { x: 0.5, y: 0.6 };
+function landmarksFromPose(pose) {
   const points = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5 }));
-  points[0] = { x: 0.5, y: 0.1 }; // 鼻
-  points[11] = { x: 0.42, y: 0.25 }; points[12] = { x: 0.58, y: 0.25 }; // 肩
-  points[13] = { x: 0.44, y: 0.14 }; points[14] = { x: 0.56, y: 0.14 }; // 肘（上举）
-  points[15] = { x: 0.46, y: 0.02 }; points[16] = { x: 0.54, y: 0.02 }; // 腕（过头）
-  points[23] = { x: 0.45, y: 0.55 }; points[24] = { x: 0.55, y: 0.55 }; // 髋
+  for (const [index, p] of Object.entries(pose)) {
+    points[Number(index)] = { x: ORIGIN.x + p.x * SCALE, y: ORIGIN.y + p.y * SCALE };
+  }
   return points;
 }
 
-test('8 式结构完整：名称/口令/依据/至少两个评分要素', () => {
+test('8 式结构：名称/口令/依据/关键帧姿势全部有效', () => {
   assert.equal(BADUANJIN_MOVES.length, 8);
   for (const move of BADUANJIN_MOVES) {
     assert.ok(move.id && move.name && move.cue && move.evidence, move.id);
-    assert.ok(move.evaluators.length >= 2, move.id);
-    for (const evaluator of move.evaluators) {
-      assert.ok(evaluator.id && evaluator.label && typeof evaluator.test === 'function', `${move.id}.${evaluator.id}`);
+    assert.ok(move.keyframes.length >= 2, move.id);
+    assert.equal(move.keyframes[0].at, 0);
+    assert.equal(move.keyframes[move.keyframes.length - 1].at, 1);
+    for (const frame of move.keyframes) {
+      assert.ok(POSE_LIBRARY[frame.pose], `${move.id} 引用了未知姿势 ${frame.pose}`);
     }
   }
 });
 
-test('特征提取：相对高度以躯干长为单位', () => {
-  const features = extractBaduanjinFeatures(tuotianLandmarks());
-  assert.ok(features);
-  assert.ok(features.wristAboveHeadL > 0.2, `aboveHead ${features.wristAboveHeadL}`);
-  assert.ok(Math.abs(features.torsoLean) < 1e-9);
-  assert.equal(extractBaduanjinFeatures([{}, {}]), null);
+test('标准轨迹：关键帧处等于姿势本身，中间平滑插值', () => {
+  const tuotian = BADUANJIN_MOVES.find((move) => move.id === 'tuotian');
+  const atUp = referencePoseAt(tuotian, 0.5);
+  assert.ok(Math.abs(atUp[15].y - POSE_LIBRARY.up[15].y) < 1e-9);
+  const atStart = referencePoseAt(tuotian, 0);
+  assert.ok(Math.abs(atStart[15].y - POSE_LIBRARY.stand[15].y) < 1e-9);
+  const mid = referencePoseAt(tuotian, 0.35); // cross(0.2) → up(0.5) 之间
+  assert.ok(mid[15].y < POSE_LIBRARY.cross[15].y && mid[15].y > POSE_LIBRARY.up[15].y, `插值 ${mid[15].y}`);
+  assert.equal(referencePoseAt({ keyframes: [] }, 0.5), null);
 });
 
-test('评分：标准托天高分；垂手做托天低分且关节暴露偏离', () => {
-  const move = BADUANJIN_MOVES.find((item) => item.id === 'tuotian');
-  const good = scoreMove(move, tuotianLandmarks());
-  assert.ok(good.score >= 85, `好动作 ${good.score}`);
-  assert.equal(good.jointStates[15], 'ok');
-  assert.ok(good.feedback.length === 0);
+test('归一化：平移缩放的骨骼可精确还原回标准空间', () => {
+  const normalized = normalizeSkeleton(landmarksFromPose(POSE_LIBRARY.stand), 1);
+  assert.ok(normalized);
+  for (const [index, expected] of Object.entries(POSE_LIBRARY.stand)) {
+    const got = normalized.points[Number(index)];
+    assert.ok(Math.abs(got.x - expected.x) < 1e-6 && Math.abs(got.y - expected.y) < 1e-6, `关节 ${index}`);
+  }
+  assert.equal(normalizeSkeleton([{}, {}]), null);
+});
 
-  const armsDown = tuotianLandmarks();
-  armsDown[15] = { x: 0.42, y: 0.62 };
-  armsDown[16] = { x: 0.58, y: 0.62 };
-  const bad = scoreMove(move, armsDown);
-  assert.ok(bad.score <= 70, `垂手 ${bad.score}`);
-  assert.ok(good.score - bad.score >= 25, `区分度 ${good.score - bad.score}`);
-  // 最差状态优先：手没举起来 → 腕关节必须显示偏离，不能被"双手齐平"盖住
-  assert.equal(bad.jointStates[15], 'off');
-  assert.ok(bad.feedback.includes('双手托至头上'));
+test('对比打分：标准姿势满分；偏离姿势低分并暴露偏离关节', () => {
+  const exact = comparePoses(POSE_LIBRARY.up, POSE_LIBRARY.up);
+  assert.equal(exact.score, 100);
+  assert.ok(Object.values(exact.jointStates).every((state) => state === 'ok'));
+
+  const mismatched = comparePoses(POSE_LIBRARY.up, POSE_LIBRARY.stand); // 手没举起来
+  assert.ok(mismatched.score <= 60, `偏离 ${mismatched.score}`);
+  assert.equal(mismatched.jointStates[15], 'off');
+});
+
+test('matchScore：时滞窗口容忍提前/滞后，未做动作仍低分', () => {
+  const tuotian = BADUANJIN_MOVES.find((move) => move.id === 'tuotian');
+  const upPose = landmarksFromPose(POSE_LIBRARY.up);
+  const onTime = matchScore(tuotian, upPose, 0.5, { aspect: 1 });
+  assert.ok(onTime.score >= 90, `准时 ${onTime.score}`);
+  const early = matchScore(tuotian, upPose, 0.35, { aspect: 1 });
+  assert.ok(early.score >= 85, `提前 ${early.score}`);
+  const notYet = matchScore(tuotian, landmarksFromPose(POSE_LIBRARY.stand), 0.5, { aspect: 1 });
+  assert.ok(notYet.score <= 60, `没做 ${notYet.score}`);
+  assert.ok(onTime.reference && onTime.scale > 0 && onTime.origin, '返回参考骨架与坐标锚');
 });
 
 test('时间轴：8 式推进到 done（短时长配置）', () => {

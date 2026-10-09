@@ -7,7 +7,7 @@ import { DevicemotionSource, requestMotionPermission } from './sources/devicemot
 import { BleImuSource } from './sources/web-bluetooth.js';
 import { matchVoiceCommand, isScheduleDue, isDoseDue, dayKey } from './core/training.js';
 import { DEFAULT_BPM, clampBpm, breathPhaseAt } from './core/music.js';
-import { BaduanjinSession, scoreMove, aggregateScores } from './core/baduanjin.js';
+import { BaduanjinSession, matchScore, aggregateScores } from './core/baduanjin.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -264,7 +264,32 @@ function drawPose(points) {
     }
   }
 
-  // 火柴人染色：跟练模式按评分要素的达标状态着色（绿=达标/黄=接近/灰=偏离）
+  // 标准轨迹参考骨架（蓝色细线）：按跟练人的坐标锚点（髋中+肩宽）叠加，
+  // 与实时骨架重叠对比——蓝线=应该到的姿势，彩色=实际姿势。
+  if (baduanjin?.reference) {
+    const ref = baduanjin.reference;
+    const H = c.height; // 归一化空间（aspect 校正）→ 像素：乘画布高
+    ctx.strokeStyle = 'rgba(58, 90, 153, 0.6)';
+    ctx.lineWidth = 2.5;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    connections.forEach(([a, b]) => {
+      const pa = ref.points[a];
+      const pb = ref.points[b];
+      if (!pa || !pb) return;
+      ctx.moveTo((ref.origin.x + pa.x * ref.scale) * H, (ref.origin.y + pa.y * ref.scale) * H);
+      ctx.lineTo((ref.origin.x + pb.x * ref.scale) * H, (ref.origin.y + pb.y * ref.scale) * H);
+    });
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(58, 90, 153, 0.6)';
+    for (const p of Object.values(ref.points)) {
+      ctx.beginPath();
+      ctx.arc((ref.origin.x + p.x * ref.scale) * H, (ref.origin.y + p.y * ref.scale) * H, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 火柴人染色：跟练模式按偏差状态着色（绿=达标/黄=接近/灰=偏离）
   const jointStates = baduanjin?.jointStates ?? null;
   const JOINT_COLORS = { ok: '#2f9e6e', near: '#d9822b', off: '#8a8a8a' };
   const boneColor = (a, b) => {
@@ -303,13 +328,13 @@ function predictLoop() {
     const result = poseLandmarker.detectForVideo(ui.video, now);
     if (result.landmarks?.[0]) {
       const points = result.landmarks[0];
+      if (baduanjin) baduanjinTick(points, now / 1000); // 先更新参考骨架，再一并绘制（时钟：秒）
       drawPose(points);
       const t = (now - sessionStart) / 1000;
       const dt = previousAt ? (now - previousAt) / 1000 : 1 / 15;
       const observation = poseObservation(points, previousPose, dt, t);
       previousPose = observation.debug;
       previousAt = now;
-      if (baduanjin) baduanjinTick(points, now / 1000); // 时钟统一为秒（与 startBaduanjin 一致）
       const step = agent.ingest(observation);
       handleStep(step);
     }
@@ -823,12 +848,15 @@ function baduanjinTick(points, now) {
     baduanjin.current = { sum: 0, frames: 0, smooth: null };
     speak(`${current.move.name}。${current.move.cue}`);
   }
-  const result = scoreMove(current.move, points);
-  if (result.score != null) {
+  // 与标准轨迹对比：时滞窗口内最佳对齐 → 分数 + 逐关节偏差 + 参考骨架
+  const aspect = ui.video.videoWidth && ui.video.videoHeight ? ui.video.videoWidth / ui.video.videoHeight : 16 / 9;
+  const result = matchScore(current.move, points, current.progress, { aspect });
+  if (result) {
     baduanjin.current.sum += result.score;
     baduanjin.current.frames += 1;
     baduanjin.current.smooth = Math.round(baduanjin.current.sum / baduanjin.current.frames);
     baduanjin.jointStates = result.jointStates;
+    baduanjin.reference = { points: result.reference, scale: result.scale, origin: result.origin };
   }
   renderBaduanjin(current);
 }
@@ -868,6 +896,7 @@ function startBaduanjin() {
     lastMove: null,
     current: null,
     jointStates: null,
+    reference: null,
   };
   skeletonTrails = { wristL: [], wristR: [], hip: [] };
   ui.baduanjinBtn.textContent = '结束跟练';

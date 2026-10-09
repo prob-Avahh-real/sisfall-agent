@@ -1,13 +1,20 @@
-// 八段锦跟练与打分：8 式动作库、每式 2-3 个可解释的评分要素、时间轴会话、
-// 关节反馈（供火柴人染色）。正面摄像头可观测的几何特征优先——例如
-// "往后瞧"一式依赖转头，正面视角不可靠，因此该式的评分侧重躯干端正。
+// 八段锦跟练与打分：标准轨迹参考 + 实时动捕对比。
 //
-// 定位（见 core/pd-profile.js）：属于 train（训练引导）范围内的传统功法
-// 练习——八段锦常见于中老年平衡与柔韧维持的康复实践；打分是**练习反馈**
-// （幅度/对称/稳定），不是医疗评估，不声称疗效。
+// 工作方式（与 v1 的独立规则评分不同，这里是轨迹对齐评分）：
+//   1. MOVES 每式带一段**预加载的标准轨迹**——由 POSE_LIBRARY 的关键帧
+//      姿势（归一化骨骼：原点=髋中、单位=肩宽、y 向下）按 smoothstep 插值
+//      生成 referencePoseAt(move, progress)。
+//   2. 实时动捕（MediaPipe 33 点）经 normalizeSkeleton 变换到同一归一化
+//      空间（含画幅宽高比校正与肩宽缩放）。
+//   3. comparePoses 逐关节计算加权距离 → 0-100 分与逐关节偏差状态；
+//      matchScore 在 ±时滞窗口内搜索最佳对齐（容忍跟练人的反应延迟）。
+//   4. UI 在同一坐标锚点上叠加绘制两个火柴人（蓝色细线=标准参考，
+//      彩色=跟练人），偏差大的关节染灰、接近染黄、达标染绿。
 //
-// 评分全部基于 33 点骨骼（MediaPipe 索引）的可解释规则，逐帧输出 0-100，
-// 与本项目"规则可审计"的口径一致；接口对合成 landmarks 开放，便于测试。
+// 诚实声明：标准轨迹是**程序化编排的示意动作**，不是真人动捕数据；后续
+// 可替换为真实动捕序列（数据结构兼容：关节坐标帧序列即可）。
+// 定位（core/pd-profile.js）：train 范围内的传统功法练习，打分为练习反馈，
+// 不是医疗评估，不声称疗效。
 
 import { DEFAULT_CONFIG } from './config.js';
 
@@ -17,11 +24,21 @@ export const LANDMARK_INDEX = {
   elbowL: 13, elbowR: 14,
   wristL: 15, wristR: 16,
   hipL: 23, hipR: 24,
+  kneeL: 25, kneeR: 26,
+  ankleL: 27, ankleR: 28,
+};
+
+/** 参与对比的关节与权重（腕/肘重一点——动作幅度主要看上肢）。 */
+export const JOINT_LIST = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+export const JOINT_WEIGHTS = { 15: 2, 16: 2, 13: 1.5, 14: 1.5 };
+export const SCORE_CONFIG = {
+  tolerance: 0.55, // 加权平均距离达到此值记 0 分（单位与归一化空间一致=肩宽）
+  okDistance: 0.18, // 单关节偏差 ≤ 此值 → 达标
+  nearDistance: 0.35, // ≤ 此值 → 接近
 };
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
-/** value 从 from（记 0 分）线性到 to（记 1 分），越界自动钳制。 */
-const ramp = (value, from, to) => clamp01((value - from) / (to - from));
+const smoothstep = (p) => p * p * (3 - 2 * p);
 const finite = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 
 function point(landmarks, index) {
@@ -32,180 +49,288 @@ function point(landmarks, index) {
   return x == null || y == null ? null : { x, y };
 }
 
-function angleBend(joint, a, b) {
-  if (!joint || !a || !b) return 180;
-  const v1 = { x: a.x - joint.x, y: a.y - joint.y };
-  const v2 = { x: b.x - joint.x, y: b.y - joint.y };
-  const n1 = Math.hypot(v1.x, v1.y);
-  const n2 = Math.hypot(v2.x, v2.y);
-  if (n1 < 1e-9 || n2 < 1e-9) return 180;
-  const cos = Math.min(1, Math.max(-1, (v1.x * v2.x + v1.y * v2.y) / (n1 * n2)));
-  return (Math.acos(cos) * 180) / Math.PI;
+// ---------------------------------------------------------------------------
+// 标准姿势库（归一化：原点=髋中点，单位=肩宽，y 向下为正）。
+const STAND = {
+  0: [0, -1.9],
+  11: [-0.5, -1.3], 12: [0.5, -1.3],
+  13: [-0.55, -0.75], 14: [0.55, -0.75],
+  15: [-0.6, -0.2], 16: [0.6, -0.2],
+  23: [-0.45, 0], 24: [0.45, 0],
+  25: [-0.45, 0.9], 26: [0.45, 0.9],
+  27: [-0.45, 1.8], 28: [0.45, 1.8],
+};
+
+const asPoints = (source) => Object.fromEntries(Object.entries(source).map(([k, v]) => [k, { x: v[0], y: v[1] }]));
+
+/** 逐点镜像（x 取反），用于左右交替式。 */
+function mirror(pose) {
+  return Object.fromEntries(Object.entries(pose).map(([k, v]) => [k, { x: -v.x, y: v.y }]));
 }
 
-/**
- * 提取一帧的评分特征（归一化图像坐标，y 向下增大）。
- * 相对高度以躯干长度为单位：>0 表示高于肩/头。
- * @returns {object|null} landmarks 不完整时返回 null
- */
-export function extractBaduanjinFeatures(landmarks) {
-  const nose = point(landmarks, LANDMARK_INDEX.nose);
-  const sl = point(landmarks, LANDMARK_INDEX.shoulderL);
-  const sr = point(landmarks, LANDMARK_INDEX.shoulderR);
-  const el = point(landmarks, LANDMARK_INDEX.elbowL);
-  const er = point(landmarks, LANDMARK_INDEX.elbowR);
-  const wl = point(landmarks, LANDMARK_INDEX.wristL);
-  const wr = point(landmarks, LANDMARK_INDEX.wristR);
-  const hl = point(landmarks, LANDMARK_INDEX.hipL);
-  const hr = point(landmarks, LANDMARK_INDEX.hipR);
-  if (!sl || !sr || !wl || !wr || !hl || !hr) return null;
-
-  const shoulderMid = { x: (sl.x + sr.x) / 2, y: (sl.y + sr.y) / 2 };
-  const hipMid = { x: (hl.x + hr.x) / 2, y: (hl.y + hr.y) / 2 };
-  const torso = Math.max(1e-6, hipMid.y - shoulderMid.y);
-  const headY = nose ? nose.y : shoulderMid.y - torso * 0.55;
-
-  return {
-    shoulderMid,
-    hipMid,
-    torso,
-    wristAboveShoulderL: (shoulderMid.y - wl.y) / torso,
-    wristAboveShoulderR: (shoulderMid.y - wr.y) / torso,
-    wristAboveHeadL: (headY - wl.y) / torso,
-    wristAboveHeadR: (headY - wr.y) / torso,
-    wristBelowHipL: (wl.y - hipMid.y) / torso,
-    wristBelowHipR: (wr.y - hipMid.y) / torso,
-    handsSymmetryY: 1 - Math.min(1, Math.abs(wl.y - wr.y) / (torso * 0.35)),
-    handsWidth: Math.abs(wl.x - wr.x) / torso,
-    torsoLean: Math.abs(shoulderMid.x - hipMid.x) / torso,
-    elbowBendL: angleBend(el, sl, wl),
-    elbowBendR: angleBend(er, sr, wr),
+export const POSE_LIBRARY = (() => {
+  const stand = asPoints(STAND);
+  const merged = (overrides) => {
+    const base = asPoints(STAND);
+    for (const [k, v] of Object.entries(overrides)) base[k] = { x: v[0], y: v[1] };
+    return base;
   };
-}
+  const cross = merged({
+    13: [-0.35, -1.05], 14: [0.35, -1.05],
+    15: [-0.12, -1.2], 16: [0.12, -1.2],
+  });
+  const up = merged({
+    13: [-0.4, -1.75], 14: [0.4, -1.75],
+    15: [-0.22, -2.15], 16: [0.22, -2.15],
+  });
+  const openLeft = merged({
+    13: [-0.7, -1.3], 14: [0.55, -1.35],
+    15: [-1.35, -1.3], 16: [0.35, -1.25],
+  });
+  const oneUpLeft = merged({
+    13: [-0.45, -1.7], 14: [0.55, -1.0],
+    15: [-0.3, -2.1], 16: [0.55, -0.55],
+  });
+  const bendKnees = merged({
+    0: [0, -1.35],
+    11: [-0.5, -0.95], 12: [0.5, -0.95],
+    13: [-0.6, -0.45], 14: [0.6, -0.45],
+    15: [-0.55, 0.15], 16: [0.55, 0.15],
+  });
+  const bendKneesLeft = Object.fromEntries(Object.entries(bendKnees).map(([k, v]) => [k, { x: v.x - 0.15, y: v.y }]));
+  const reach = merged({
+    0: [0, -1.05],
+    11: [-0.48, -0.75], 12: [0.48, -0.75],
+    13: [-0.5, -0.2], 14: [0.5, -0.2],
+    15: [-0.35, 0.75], 16: [0.35, 0.75],
+  });
+  const punchRight = merged({
+    13: [-0.55, -1.0], 14: [0.75, -1.1],
+    15: [-0.35, -1.2], 16: [1.25, -1.05],
+  });
+  const rise = Object.fromEntries(Object.entries(stand).map(([k, v]) => [k, { x: v.x, y: v.y - 0.1 }]));
+  return {
+    stand,
+    cross,
+    up,
+    openLeft,
+    openRight: mirror(openLeft),
+    oneUpLeft,
+    oneUpRight: mirror(oneUpLeft),
+    bendKnees,
+    bendKneesLeft,
+    bendKneesRight: mirror(bendKneesLeft),
+    reach,
+    punchRight,
+    punchLeft: mirror(punchRight),
+    rise,
+  };
+})();
 
 /**
- * 八段锦 8 式。evaluators 逐式 2-3 项，test(features) -> 0..1 的合格度；
- * joints 列出该项关联的骨骼点（供火柴人染色）。
+ * 八段锦 8 式：每式带名称/口令/依据与标准轨迹关键帧（at∈[0,1] → pose 名）。
  */
 export const BADUANJIN_MOVES = [
   {
     id: 'tuotian',
     name: '双手托天理三焦',
     cue: '双手交叉上托，掌心向上，抬头看手。',
-    evidence: '传统功法（八段锦）：中老年平衡与柔韧练习的常见推荐；本模块提供跟练与幅度反馈',
-    evaluators: [
-      { id: 'raise', label: '双手托至头上', joints: [15, 16], test: (f) => ramp(Math.max(f.wristAboveHeadL, f.wristAboveHeadR), 0, 0.15) },
-      { id: 'symmetry', label: '双手齐平', joints: [15, 16], test: (f) => f.handsSymmetryY },
-      { id: 'upright', label: '躯干端正', joints: [11, 12], test: (f) => 1 - ramp(f.torsoLean, 0.08, 0.25) },
+    evidence: '传统功法（八段锦）：中老年平衡与柔韧练习的常见推荐；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.2, pose: 'cross' },
+      { at: 0.5, pose: 'up' },
+      { at: 0.78, pose: 'up' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'kaigong',
     name: '左右开弓似射雕',
-    cue: '马步下蹲，一手拉弓一手推弓，左右交替。',
-    evidence: '传统功法（八段锦）：下肢开步与上肢对拉练习；评分为幅度与对称反馈',
-    evaluators: [
-      { id: 'wide', label: '双手拉开幅度', joints: [15, 16], test: (f) => ramp(f.handsWidth, 0.5, 1.4) },
-      { id: 'height', label: '手在肩胸高度', joints: [13, 14], test: (f) => 1 - ramp(Math.abs((f.wristAboveShoulderL + f.wristAboveShoulderR) / 2), 0.25, 0.8) },
-      { id: 'symmetry', label: '左右对称用力', joints: [11, 12], test: (f) => 1 - ramp(Math.abs(f.wristAboveShoulderL - f.wristAboveShoulderR), 0.2, 0.8) },
+    cue: '马步下蹲，一手推弓一手拉弓，左右交替。',
+    evidence: '传统功法（八段锦）：上肢对拉开合练习；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.25, pose: 'openLeft' },
+      { at: 0.5, pose: 'openRight' },
+      { at: 0.75, pose: 'openLeft' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'danju',
     name: '调理脾胃须单举',
     cue: '一手上举下撑，一手下按，左右交替。',
-    evidence: '传统功法（八段锦）：单侧上举下按，练习肩带与躯干协调',
-    evaluators: [
-      { id: 'one-up', label: '一侧手举过头', joints: [15, 16], test: (f) => ramp(Math.max(f.wristAboveHeadL, f.wristAboveHeadR), -0.1, 0.2) },
-      { id: 'one-down', label: '另一侧手下按', joints: [15, 16], test: (f) => ramp(Math.max(f.wristBelowHipL, f.wristBelowHipR), -0.2, 0.3) },
+    evidence: '传统功法（八段锦）：单侧上举下按的肩带协调练习；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.25, pose: 'oneUpLeft' },
+      { at: 0.5, pose: 'oneUpRight' },
+      { at: 0.75, pose: 'oneUpLeft' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'houchou',
     name: '五劳七伤往后瞧',
     cue: '双臂下垂，缓缓转头向后看（正面视角以躯干端正为准）。',
-    evidence: '传统功法（八段锦）：颈部活动为主；正面摄像头不评转头，侧重躯干稳定',
-    evaluators: [
-      { id: 'upright', label: '躯干端正稳定', joints: [11, 12, 23, 24], test: (f) => 1 - ramp(f.torsoLean, 0.06, 0.2) },
-      { id: 'arms-down', label: '双臂自然下垂', joints: [15, 16], test: (f) => 1 - ramp(f.wristAboveShoulderL + f.wristAboveShoulderR, 0.1, 0.9) },
+    evidence: '传统功法（八段锦）：颈部活动为主；正面摄像头不评转头，标准轨迹为静立端正',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.5, pose: 'stand' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'yaotou',
     name: '摇头摆尾去心火',
     cue: '马步俯身，头与髋左右缓慢摆动。',
-    evidence: '传统功法（八段锦）：俯身与髋部摆动的协调练习',
-    evaluators: [
-      { id: 'lean', label: '上身前俯', joints: [11, 12], test: (f) => ramp(f.torsoLean, 0.05, 0.2) },
-      { id: 'hands', label: '双手接近膝上', joints: [15, 16], test: (f) => 1 - ramp(Math.abs((f.wristBelowHipL + f.wristBelowHipR) / 2 - 0.35), 0.2, 0.7) },
+    evidence: '传统功法（八段锦）：俯身与髋部摆动的协调练习；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.25, pose: 'bendKneesLeft' },
+      { at: 0.5, pose: 'bendKneesRight' },
+      { at: 0.75, pose: 'bendKneesLeft' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'panzu',
     name: '两手攀足固肾腰',
     cue: '缓慢俯身，双手沿腿下探（量力而行，不强求触地）。',
-    evidence: '传统功法（八段锦）：前屈柔韧练习；口令强调量力而行',
-    evaluators: [
-      { id: 'bend', label: '上身充分前俯', joints: [11, 12], test: (f) => ramp(f.torsoLean, 0.15, 0.45) },
-      { id: 'reach', label: '双手向下探', joints: [15, 16], test: (f) => ramp(Math.max(f.wristBelowHipL, f.wristBelowHipR), 0.1, 0.7) },
+    evidence: '传统功法（八段锦）：前屈柔韧练习，口令强调量力而行；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.4, pose: 'reach' },
+      { at: 0.7, pose: 'reach' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'cuanquan',
     name: '攒拳怒目增气力',
     cue: '马步冲拳，拳从腰间打出，左右交替。',
-    evidence: '传统功法（八段锦）：马步与出拳的上肢力量练习',
-    evaluators: [
-      { id: 'punch', label: '出拳幅度', joints: [13, 14, 15, 16], test: (f) => ramp(f.handsWidth, 0.45, 1.3) },
-      { id: 'height', label: '拳在胸腹高度', joints: [15, 16], test: (f) => 1 - ramp(Math.abs((f.wristAboveShoulderL + f.wristAboveShoulderR) / 2 + 0.15), 0.2, 0.6) },
-      { id: 'upright', label: '躯干端正', joints: [11, 12], test: (f) => 1 - ramp(f.torsoLean, 0.08, 0.25) },
+    evidence: '传统功法（八段锦）：马步与出拳的上肢力量练习；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.25, pose: 'punchRight' },
+      { at: 0.5, pose: 'punchLeft' },
+      { at: 0.75, pose: 'punchRight' },
+      { at: 1, pose: 'stand' },
     ],
   },
   {
     id: 'qidian',
     name: '背后七颠百病消',
     cue: '并步直立，脚跟提起轻放，全身放松。',
-    evidence: '传统功法（八段锦）：直立与足踝轻振动练习，收式放松',
-    evaluators: [
-      { id: 'upright', label: '身体直立', joints: [11, 12, 23, 24], test: (f) => 1 - ramp(f.torsoLean, 0.06, 0.2) },
-      { id: 'arms-natural', label: '双臂自然垂放', joints: [15, 16], test: (f) => 1 - ramp(f.wristAboveShoulderL + f.wristAboveShoulderR, 0.1, 0.9) },
+    evidence: '传统功法（八段锦）：直立与足踝轻振动的收式放松；标准轨迹为示意编排',
+    keyframes: [
+      { at: 0, pose: 'stand' },
+      { at: 0.15, pose: 'rise' },
+      { at: 0.3, pose: 'stand' },
+      { at: 0.45, pose: 'rise' },
+      { at: 0.6, pose: 'stand' },
+      { at: 0.75, pose: 'rise' },
+      { at: 1, pose: 'stand' },
     ],
   },
 ];
 
-/**
- * 对一帧骨骼按招式评分。
- * @returns {{ score: number|null, parts: [{id,label,ratio}], jointStates: {joint: 'ok'|'near'|'off'}, feedback: string[] }}
- */
-export function scoreMove(move, landmarks) {
-  const features = extractBaduanjinFeatures(landmarks);
-  if (!features || !move?.evaluators?.length) {
-    return { score: null, parts: [], jointStates: {}, feedback: [] };
-  }
-  const parts = move.evaluators.map((evaluator) => ({
-    id: evaluator.id,
-    label: evaluator.label,
-    ratio: clamp01(evaluator.test(features)),
-  }));
-  const score = Math.round((parts.reduce((sum, part) => sum + part.ratio, 0) / parts.length) * 100);
-  // 关节染色取"最差"状态：同一关节被多个要素引用时，暴露问题优先
-  // （否则"双手齐平"的达标会盖住"手没举起来"的偏离，染色会说谎）。
-  const severity = { ok: 0, near: 1, off: 2 };
-  const jointStates = {};
-  parts.forEach((part, i) => {
-    const state = part.ratio >= 0.75 ? 'ok' : part.ratio >= 0.4 ? 'near' : 'off';
-    for (const joint of move.evaluators[i].joints ?? []) {
-      if (!(joint in jointStates) || severity[state] > severity[jointStates[joint]]) {
-        jointStates[joint] = state;
-      }
+/** 标准轨迹在 progress（0..1）处的姿势：关键帧间 smoothstep 插值。 */
+export function referencePoseAt(move, progress = 0) {
+  const frames = move?.keyframes;
+  if (!frames?.length) return null;
+  const p = clamp01(progress);
+  let left = frames[0];
+  let right = frames[frames.length - 1];
+  for (let i = 0; i < frames.length - 1; i += 1) {
+    if (p >= frames[i].at && p <= frames[i + 1].at) {
+      left = frames[i];
+      right = frames[i + 1];
+      break;
     }
-  });
-  return {
-    score,
-    parts,
-    jointStates,
-    feedback: parts.filter((part) => part.ratio < 0.75).map((part) => part.label),
-  };
+  }
+  const span = Math.max(1e-6, right.at - left.at);
+  const t = smoothstep(clamp01((p - left.at) / span));
+  const a = POSE_LIBRARY[left.pose];
+  const b = POSE_LIBRARY[right.pose];
+  if (!a || !b) return null;
+  const out = {};
+  for (const key of Object.keys(a)) {
+    const pa = a[key];
+    const pb = b[key] ?? pa;
+    out[key] = { x: pa.x + (pb.x - pa.x) * t, y: pa.y + (pb.y - pa.y) * t };
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+/** 把实时骨骼归一化到标准空间（原点=髋中、单位=肩宽，含宽高比校正）。 */
+export function normalizeSkeleton(landmarks, aspect = 1) {
+  const sl = point(landmarks, 11);
+  const sr = point(landmarks, 12);
+  const hl = point(landmarks, 23);
+  const hr = point(landmarks, 24);
+  if (!sl || !sr || !hl || !hr) return null;
+  const scale = Math.hypot((sr.x - sl.x) * aspect, sr.y - sl.y);
+  if (!(scale > 1e-6)) return null;
+  const origin = { x: ((hl.x + hr.x) / 2) * aspect, y: (hl.y + hr.y) / 2 };
+  const points = {};
+  for (const index of JOINT_LIST) {
+    const p = point(landmarks, index);
+    if (!p) continue; // 局部遮挡允许缺关节
+    points[index] = { x: (p.x * aspect - origin.x) / scale, y: (p.y - origin.y) / scale };
+  }
+  if (!points[11] || !points[15] || !points[16]) return null; // 关键关节缺失 → 该帧无效
+  return { points, scale, origin };
+}
+
+/** 逐关节加权距离 → 0-100 分与逐关节偏差状态。 */
+export function comparePoses(reference, userPoints) {
+  if (!reference || !userPoints) return null;
+  let weightSum = 0;
+  let distSum = 0;
+  const perJoint = {};
+  for (const index of JOINT_LIST) {
+    const r = reference[index];
+    const u = userPoints[index];
+    if (!r || !u) continue;
+    const d = Math.hypot(r.x - u.x, r.y - u.y);
+    const weight = JOINT_WEIGHTS[index] ?? 1;
+    perJoint[index] = d;
+    distSum += d * weight;
+    weightSum += weight;
+  }
+  if (!weightSum) return null;
+  const distance = distSum / weightSum;
+  const score = Math.round(100 * clamp01(1 - distance / SCORE_CONFIG.tolerance));
+  const jointStates = {};
+  for (const [index, d] of Object.entries(perJoint)) {
+    jointStates[index] = d <= SCORE_CONFIG.okDistance ? 'ok' : d <= SCORE_CONFIG.nearDistance ? 'near' : 'off';
+  }
+  return { distance, score, jointStates, perJoint };
+}
+
+/**
+ * 与标准轨迹对比打分（含时滞容忍）：在 progress 的 ±窗口内搜索最匹配的
+ * 参考帧——跟练人的动作常有滞后/提前，对齐后再比较姿势形状。
+ * @returns {null|{score, distance, matchedProgress, reference, scale, origin, jointStates}}
+ */
+export function matchScore(move, landmarks, progress = 0, options = {}) {
+  const { aspect = 1, backWindow = 0.15, aheadWindow = 0.2, samples = 8 } = options;
+  const user = normalizeSkeleton(landmarks, aspect);
+  if (!user) return null;
+  let best = null;
+  for (let i = 0; i < samples; i += 1) {
+    const p = clamp01(progress - backWindow + ((backWindow + aheadWindow) * i) / (samples - 1));
+    const reference = referencePoseAt(move, p);
+    const compared = comparePoses(reference, user.points);
+    if (compared && (!best || compared.score > best.score)) {
+      best = { ...compared, matchedProgress: p, reference };
+    }
+  }
+  if (!best) return null;
+  return { ...best, scale: user.scale, origin: user.origin };
 }
 
 // ---------------------------------------------------------------------------
