@@ -7,8 +7,7 @@
 //    stable afterwards.
 //
 // Build & run (from firmware/sisfall_preimpact):
-//   cc -std=c11 -Wall -Wextra -Werror -O2 -I. -Itest \
-//      detector.c test/detector_host_test.c -lm -o host_test && ./host_test
+//   cc -std=c11 -Wall -Wextra -Werror -O2 -I. -Itest detector.c test/detector_host_test.c -lm -o host_test && ./host_test
 //
 // This is the verification boundary: on-device behavior (I2C timing, BLE,
 // haptics) still needs the README manual checklist.
