@@ -64,6 +64,13 @@ test('时间轴：8 式推进到 done（短时长配置）', () => {
   assert.equal(session.currentAt(100 + session.totalSec + 1).phase, 'done');
 });
 
+test('非法时间不误报 done：undefined/NaN 返回 idle（时钟域错误的防线）', () => {
+  const session = new BaduanjinSession({ config: DEFAULT_CONFIG, now: 50 });
+  assert.equal(session.currentAt(undefined).phase, 'idle');
+  assert.equal(session.currentAt(NaN).phase, 'idle');
+  assert.equal(session.currentAt(50.5).phase, 'move'); // 正常时钟仍是 move
+});
+
 test('聚合：平均分、空帧处理与总量', () => {
   const summary = aggregateScores([
     { id: 'a', name: '甲', score: 80 },

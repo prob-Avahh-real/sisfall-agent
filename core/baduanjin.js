@@ -240,7 +240,9 @@ export class BaduanjinSession {
   }
 
   currentAt(t) {
-    if (!this.startedAt) return { phase: 'idle', total: BADUANJIN_MOVES.length };
+    if (!this.startedAt || !Number.isFinite(t)) {
+      return { phase: 'idle', total: BADUANJIN_MOVES.length };
+    }
     const step = this.steps.find((candidate) => t < candidate.end);
     if (!step) {
       return { phase: 'done', index: BADUANJIN_MOVES.length, total: BADUANJIN_MOVES.length, remaining: 0, progress: 1, cue: '' };

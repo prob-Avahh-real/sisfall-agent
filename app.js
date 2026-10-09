@@ -309,7 +309,7 @@ function predictLoop() {
       const observation = poseObservation(points, previousPose, dt, t);
       previousPose = observation.debug;
       previousAt = now;
-      if (baduanjin) baduanjinTick(points, now);
+      if (baduanjin) baduanjinTick(points, now / 1000); // 时钟统一为秒（与 startBaduanjin 一致）
       const step = agent.ingest(observation);
       handleStep(step);
     }
