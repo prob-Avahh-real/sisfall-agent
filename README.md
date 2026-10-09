@@ -249,6 +249,11 @@ AAN — exercise/physiotherapy as low-risk management options; 《中国帕金�
   big-arc turning, freeze-response drill), each carrying an `evidence` field.
 - **Added**: medication time reminders (a plain daily clock, set per your
   clinician's schedule) and the freeze-response drill.
+- **Orthostatic (postural) symptoms**: covered as the 起身发晕 check-in (the
+  highest-weighted symptom) plus graduated stand-up / transfer cues and
+  trigger windows (after medication, after meals, in heat). Formal evaluation
+  and management (BP measurement, medication changes, compression stockings)
+  stay with clinicians — see the boundaries above.
 
 ## Environment inference & active inquiry (2026-10)
 

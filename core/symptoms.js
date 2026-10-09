@@ -32,7 +32,7 @@ export function adviceFor(symptom, windowRemainingSec = 0) {
     windowRemainingSec > 60 ? `（高度关注约 ${Math.round(windowRemainingSec / 60)} 分钟）` : '';
   switch (symptom) {
     case 'dizziness':
-      return `起身发晕时先坐稳、再缓慢站起；症状持续期间智能体会更早预警。若反复出现，请告知医生。${windowNote}`;
+      return `起身发晕时先坐稳片刻、再缓慢站起，站稳后再迈步；服药后、饭后与天热时更容易出现，尤其放慢。若反复出现，请告知医生。${windowNote}`;
     case 'fatigue':
       return `建议先休息，再继续行走。${windowNote}`;
     case 'sleepDebt':
