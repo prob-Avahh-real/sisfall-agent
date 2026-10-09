@@ -1,0 +1,5 @@
+# Real datasets are never committed (see data/README.md for acquisition).
+data/sisfall/
+
+# Node
+node_modules/

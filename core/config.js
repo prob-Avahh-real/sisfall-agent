@@ -50,6 +50,15 @@ export const DEFAULT_CONFIG = {
     },
   },
 
+  learned: {
+    // Learned risk model (M3) window parameters, shared by training and runtime
+    // (the shared vectorizer lives in core/learned.js). The model artifact
+    // (models/risk-v1.js) is plugged in via the agent constructor.
+    windowSec: 1.0,        // feature window scored by the model
+    minWindowSec: 0.6,     // minimum span before a window is scoreable
+    bufferSec: 1.5,        // feature-frame buffer horizon inside the agent
+  },
+
   baseline: {
     warmupFrames: 90,      // ~6 s at 15 Hz before personalization is trusted
     ewmaAlpha: 0.0005,     // slow drift of the personal normal (≈minutes, not seconds)

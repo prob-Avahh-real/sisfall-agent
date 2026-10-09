@@ -24,8 +24,11 @@ emits stage-matched care advice. Prototype, not a medical device.
 
 ```bash
 npm test          # must stay green; deterministic scenarios only
-npm run demo      # node scripts/demo.js [scenario]
+npm run demo      # node scripts/demo.js [scenario] [--model]
 npm start         # dev server
+npm run train     # retrain + re-export models/risk-v1 (AUC ratchet 0.85)
+npm run evaluate  # false-alarm + alarm-latency summary
+npm run review    # regenerate reports/review-packet.md
 node --test --experimental-test-coverage   # coverage snapshot
 ```
 
@@ -54,6 +57,11 @@ node --test --experimental-test-coverage   # coverage snapshot
 7. **Scene changes are strategy-table changes**: new symptom = config + label +
    chip; new stage = `care.js` content; new source = `sources/` adapter.
    The agent loop does not grow special cases.
+8. **Model artifacts carry provenance**: `npm run train` splits by run (never
+   by window), refuses AUC < 0.85, and writes provenance + limitations into
+   `models/risk-v1.{js,json}`. Never hand-edit artifacts; never quote model
+   metrics without the `trainedOn.source` context (`synthetic-v1` is pipeline
+   validation, not clinical evidence).
 
 ## Where to change what
 
@@ -77,5 +85,9 @@ node --test --experimental-test-coverage   # coverage snapshot
 - Device radio paths (motion permission, BLE pairing, real sample rates) are
   hardware/OS dependent and not CI-coverable; keep the README manual device
   checklist in sync when touching those sources.
-- Learned risk model (M3) must plug in behind `predictor`/`risk` interfaces
-  with the same coverage + explainability contracts.
+- The committed model is trained on the synthetic pipeline-validation corpus;
+  real-data numbers await a SisFall run (`data/README.md`). The review packet
+  carries the same caveat — keep it that way until real numbers exist.
+- Model-based scoring is wired behind the risk contract ({ model } ctor
+  option); any future model upgrade must keep neutral-z coverage handling and
+  driver explainability (invariant 8).

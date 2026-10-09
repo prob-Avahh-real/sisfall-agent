@@ -6,16 +6,25 @@
 //   node scripts/demo.js [stable|wobble|wobble-shift|dizzy-walk|near-fall|imu-near-fall]
 
 import { SteadyStepAgent } from '../core/agent.js';
+import { LearnedRiskModel } from '../core/learned.js';
 import { runScenario, interleave, SCENARIOS } from '../sources/sim.js';
 
-const name = process.argv[2] ?? 'near-fall';
+const args = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+const name = args[0] ?? 'near-fall';
+const useModel = process.argv.includes('--model');
 if (!SCENARIOS[name]) {
   console.error(`Unknown scenario "${name}". Options: ${Object.keys(SCENARIOS).join(', ')}`);
   process.exit(2);
 }
 
 const { observations, checkins, meta } = runScenario(name);
-const agent = new SteadyStepAgent();
+let model = null;
+if (useModel) {
+  const artifact = (await import('../models/risk-v1.js')).default;
+  model = LearnedRiskModel.fromArtifact(artifact);
+  console.log(`model: ${artifact.version} (validation AUC ${artifact.metrics.auc.toFixed(3)}) — rules kept as ruleScore`);
+}
+const agent = new SteadyStepAgent({ model });
 let lastState = null;
 let lastStage = null;
 

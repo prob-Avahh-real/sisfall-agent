@@ -10,11 +10,14 @@ This is a prototype, not a medical device. See "Safety" below.
 ## Quick start
 
 ```bash
-npm test                                   # 69 tests, deterministic scenarios
+npm test                                   # 96 tests, deterministic scenarios
 npm run demo                               # near-fall scenario, full agent timeline
+node scripts/demo.js near-fall --model     # learned scorer instead of rules
 node scripts/demo.js dizzy-walk            # symptom-fusion scenario
-node scripts/demo.js wobble-shift          # unusual-for-you detection
 npm start                                  # web UI at http://localhost:4173
+npm run train                              # train + export models/risk-v1 (AUC ratchet 0.85)
+npm run evaluate                           # false-alarm + alarm-latency summary
+npm run review                             # regenerate the clinical review packet
 ```
 
 The web UI has four input modes: **camera** (MediaPipe pose, needs first-load
@@ -160,6 +163,36 @@ Chrome.
    press **Connect BLE band** → chooser → connect → notifications stream (badge
    shows `BLE · Hz`). Use the module's real UUIDs in config if they differ.
 
+## Learned risk model (M3)
+
+The rule scorer stays the default; a learned logistic-regression window scorer
+plugs in behind the same contract via the agent constructor
+(`new SteadyStepAgent({ model })`; see `node scripts/demo.js near-fall --model`).
+
+- `core/learned.js` — ONE window vectorizer shared by training and runtime
+  (lean/offset/drop/asymmetry max·mean·rate over ~1 s). Unavailable features
+  contribute neutrally (standardized 0 = personal average), proxies are
+  discounted, and drivers list the top positive contributions.
+- `tools/corpus.js` — deterministic synthetic corpus (walk / near-fall / hard
+  fall) through the REAL IMU mapper. Labels start where an envelope is
+  feature-visible, not where it starts on paper; fixing that label noise was
+  worth +0.19 validation AUC during development.
+- `npm run train` — pure-JS logistic regression, run-wise train/validation
+  split (no window leakage), AUC/F1 and best-F1 threshold; refuses to emit an
+  artifact below the 0.85 AUC ratchet. Writes `models/risk-v1.{js,json}` with
+  provenance and limitations baked in.
+- Real data: `data/README.md` — SisFall adapter (`tools/sisfall.js`) plus
+  `npm run train -- --sisfall data/sisfall`. The committed artifact says
+  `trainedOn.source = synthetic-v1` and is pipeline validation, not clinical
+  evidence.
+- Metrics ratchets (`test/metrics.test.js`): zero audio alarms across 6 seeded
+  stable + 6 wobble runs; every near-fall alarmed before the danger band with
+  mean lead ≥ 0.4 s (currently 0.76 s, min 0.73 s).
+
+Honesty clause: real-world performance, per-hour false-alarm rates, and
+threshold justification require the SisFall-class run — those numbers are
+pending, and `npm run review` regenerates the packet that tracks that gap.
+
 ## Safety & privacy
 
 Prototype only — not a validated medical device or emergency service. Risk
@@ -181,8 +214,10 @@ This is a dev server (`python3 -m http.server`) — not a deployment story.
   latency/battery instrumentation and unit tests; on-device behavior pending the
   manual checklist above; native/background path (Capacitor) and vendor-watch
   companion apps remain open
-- **M3** data + validation: SisFall/MobiFall-class training data for the learned
-  risk model, false-alarm/alarm-latency targets, clinical review of thresholds
-  and staging
+- **M3** 🔄 pipeline delivered: shared window vectorizer, deterministic synthetic
+  corpus, pure-JS training with run-wise splits and the AUC ratchet, SisFall
+  adapter + acquisition guide, false-alarm/latency ratchets in CI, review
+  packet generator. Real-data numbers and the clinical review itself remain
+  open (external dependencies, tracked by `npm run review`).
 - **M4** wearable target: embedded pre-impact detector (e.g., ESP32 + IMU)
   sharing this config's thresholds; caregiver notification path

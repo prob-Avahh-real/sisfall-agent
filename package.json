@@ -6,6 +6,9 @@
   "scripts": {
     "start": "python3 -m http.server 4173",
     "test": "node --test",
-    "demo": "node scripts/demo.js"
+    "demo": "node scripts/demo.js",
+    "train": "node tools/train.js",
+    "evaluate": "node tools/evaluate.js",
+    "review": "node tools/review-packet.js"
   }
 }

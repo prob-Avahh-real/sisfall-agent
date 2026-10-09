@@ -24,15 +24,18 @@ import { assessRisk } from './risk.js';
 import { createPolicyState, decidePolicy } from './policy.js';
 import { Journal } from './journal.js';
 import { SymptomState, adviceFor, SYMPTOM_LABELS } from './symptoms.js';
+import { buildWindowVector } from './learned.js';
 import { PatientStager } from './staging.js';
 import { carePlan } from './care.js';
 
 const ACUTE = new Set(['imminent', 'danger']);
 
 export class SteadyStepAgent {
-  constructor({ config, journal } = {}) {
+  constructor({ config, journal, model = null } = {}) {
     this.config = mergeConfig(DEFAULT_CONFIG, config);
     this.journal = journal ?? new Journal();
+    this.model = model; // optional LearnedRiskModel; the rule scorer remains the default
+    this._featureBuf = [];
     this.baseline = new PersonalBaseline(this.config);
     this.forecast = new RiskForecast(this.config);
     this.symptoms = new SymptomState(this.config);
@@ -97,7 +100,32 @@ export class SteadyStepAgent {
 
     const wasWarm = this.baseline.warm;
     this.baseline.update(features);
-    const risk = assessRisk({ ...features, coverage: observation.coverage }, context, this.config);
+    let risk = assessRisk({ ...features, coverage: observation.coverage }, context, this.config);
+
+    // Optional learned scorer (M3) behind the same risk contract: it consumes a
+    // ~1 s feature window and, when scoreable, replaces the rule score while
+    // keeping the rule score available as `ruleScore` for audit.
+    if (this.model) {
+      const buffer = this._featureBuf;
+      buffer.push({ t, features, coverage: risk.coverage });
+      while (buffer.length && buffer[0].t < t - this.config.learned.bufferSec) buffer.shift();
+      const vector = buildWindowVector(buffer, {
+        minSpanSec: this.config.learned.minWindowSec,
+        windowSec: this.config.learned.windowSec,
+      });
+      if (vector) {
+        const learned = this.model.score(vector, this.config);
+        const bands = this.config.risk.thresholds;
+        risk = {
+          ...risk,
+          ruleScore: risk.score,
+          score: learned.score,
+          level: learned.score >= bands.danger ? 'danger' : learned.score >= bands.caution ? 'caution' : 'stable',
+          drivers: learned.drivers,
+          model: { probability: learned.probability, contributions: learned.contributions },
+        };
+      }
+    }
 
     // --- symptom fusion -------------------------------------------------
     const symptomContext = this.symptoms.at(t);
@@ -165,6 +193,7 @@ export class SteadyStepAgent {
         to: transition.to,
         score: effective.score,
         rawScore: risk.score,
+        ...(risk.ruleScore != null ? { ruleScore: risk.ruleScore } : {}),
         boost: symptomContext.boost,
       });
     }
