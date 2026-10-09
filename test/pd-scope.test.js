@@ -49,13 +49,18 @@ test('训练动作库全部带 evidence 且文本合规', () => {
   }
 });
 
-test('起身（体位）管理要素存在：症状建议与护理建议覆盖分步起身与诱因', () => {
+test('起身（体位）管理要素存在：分步起身与诱因在症状与护理建议中均有覆盖', () => {
+  // 症状建议：分步起身 + 诱因窗口
   const advice = adviceFor('dizziness', 0);
   assert.ok(advice.includes('坐稳'), '起身发晕建议含坐稳');
   assert.ok(advice.includes('缓慢站起'), '起身发晕建议含缓慢站起');
-  assert.ok(advice.includes('服药后'), '含诱因窗口提示');
-  const stage1 = carePlan({ stage: 1, provisional: false, drivers: [] });
-  assert.ok(stage1.advice.some((item) => item.text.includes('起身')), '1 级护理含起身口诀');
+  assert.ok(advice.includes('服药后'), '症状建议含诱因窗口');
+  // 护理建议：1-3 级都必须覆盖起身要点与诱因窗口（删除任一档即红）
+  for (const stage of [1, 2, 3]) {
+    const plan = carePlan({ stage, provisional: false, drivers: [] });
+    assert.ok(plan.advice.some((item) => item.text.includes('起身')), `${stage} 级护理含起身要点`);
+    assert.ok(plan.advice.some((item) => item.text.includes('服药后')), `${stage} 级护理含诱因窗口`);
+  }
   const stage3 = carePlan({ stage: 3, provisional: false, drivers: [] });
-  assert.ok(stage3.advice.some((item) => item.text.includes('发晕')), '3 级护理含起身看护');
+  assert.ok(stage3.advice.some((item) => item.text.includes('发晕')), '3 级护理含发晕处置');
 });
