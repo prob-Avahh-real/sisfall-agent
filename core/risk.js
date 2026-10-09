@@ -40,7 +40,7 @@ export function assessRisk(features = {}, context = {}, config = DEFAULT_CONFIG)
     coverage[key] === 'unavailable' ? 0 : pressures[key],
     FEATURE_LABELS[key],
   ])
-    .concat([[env, 'Environmental risk reported']])
+    .concat([[env, '环境风险已记录']])
     .filter(([value]) => value > driversFloor)
     .sort((a, b) => b[0] - a[0])
     .map(([, label]) => label)
@@ -49,7 +49,7 @@ export function assessRisk(features = {}, context = {}, config = DEFAULT_CONFIG)
   return {
     score,
     level,
-    drivers: drivers.length ? drivers : ['Posture remains within the stable range'],
+    drivers: drivers.length ? drivers : ['姿态处于稳定范围内'],
     coverage,
   };
 }

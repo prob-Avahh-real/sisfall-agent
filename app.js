@@ -8,8 +8,8 @@ import { BleImuSource } from './sources/web-bluetooth.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
-  video: $('video'), canvas: $('canvas'), empty: $('emptyState'), live: $('liveBadge'),
-  score: $('score'), gauge: $('gauge'), label: $('riskLabel'), signals: $('signals'),
+  video: $('video'), canvas: $('canvas'), empty: $('emptyState'), emptyText: $('emptyText'), live: $('liveBadge'),
+  score: $('score'), gaugeBar: $('gaugeBar'), label: $('riskLabel'), signals: $('signals'),
   alert: $('alertBox'), advice: $('alertAdvice'), nudge: $('nudgeBox'), nudgeText: $('nudgeText'),
   toast: $('toast'), camera: $('cameraBtn'), demo: $('demoBtn'), scenario: $('scenario'),
   obstacle: $('obstacle'), sound: $('soundBtn'), stateChip: $('stateChip'),
@@ -63,7 +63,8 @@ const perf = {
 
 const SIM_EVENTS_PER_TICK = 4; // ~4x real time
 const connections = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
-const FEATURE_NAMES = { torsoLean: 'lean', lateralOffset: 'balance shift', hipDropSpeed: 'drop speed', kneeAsymmetry: 'knee loading' };
+const FEATURE_NAMES = { torsoLean: '前倾', lateralOffset: '重心偏移', hipDropSpeed: '下坠', kneeAsymmetry: '负重不均' };
+const CARE_KINDS = { activity: '活动', environment: '环境', clinical: '就医', monitoring: '监测', care: '照护' };
 const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function startSession() {
@@ -118,53 +119,60 @@ function renderCare(stage, force = false) {
   const previous = displayedStage;
   displayedStage = stage;
   const plan = agent.carePlan();
-  ui.careLabel.textContent = `${plan.label}${plan.provisional ? ' · provisional' : ''} — ${plan.headline}`;
-  ui.careAdvice.innerHTML = plan.advice.map((a) => `<li><b>${a.kind}</b>${escapeHtml(a.text)}</li>`).join('');
-  if (previous && previous.stage !== stage.stage) showToast(`Care plan updated: ${plan.label}`);
+  ui.careLabel.textContent = `${plan.label}${plan.provisional ? ' · 初步' : ''} — ${plan.headline}`;
+  ui.careAdvice.innerHTML = plan.advice.map((a) => `<li><b>${CARE_KINDS[a.kind] ?? a.kind}</b>${escapeHtml(a.text)}</li>`).join('');
+  if (previous && previous.stage !== stage.stage) showToast(`护理建议已更新：${plan.label}`);
 }
 
 function render(step) {
   const score = smoother.add(step.effective.score);
   const level = step.effective.level;
   const copy = {
-    stable: ['Stable', 'Posture looks balanced'],
-    caution: ['Caution', 'Slow down and steady yourself'],
-    danger: ['High risk', 'Move to support now'],
+    stable: ['平稳', '姿态平衡'],
+    caution: ['注意', '放慢速度，稳住身体'],
+    danger: ['高风险', '立即扶稳或坐下'],
   }[level];
+  const color = level === 'danger' ? '#d33' : level === 'caution' ? '#d9822b' : '#2f9e6e';
   ui.score.textContent = score;
-  ui.gauge.style.setProperty('--score', score);
-  const color = level === 'danger' ? '#f16a55' : level === 'caution' ? '#e6a736' : '#70e0b7';
-  ui.gauge.style.background = `conic-gradient(${color} ${score}%, #e2e8e4 0)`;
+  ui.gaugeBar.style.width = `${score}%`;
+  ui.gaugeBar.style.background = color;
   ui.label.className = `risk-label ${level}`;
-  ui.label.querySelector('b').textContent = copy[0];
-  ui.label.querySelector('small').textContent = copy[1];
+  ui.label.textContent = `${copy[0]} · ${copy[1]}`;
 
-  ui.stateChip.textContent = step.state.toUpperCase();
+  const stateText = {
+    calibrating: '校准中',
+    stable: '平稳',
+    caution: '注意',
+    imminent: '预警',
+    danger: '危险',
+    recovering: '恢复中',
+  }[step.state] ?? step.state;
+  ui.stateChip.textContent = stateText;
   ui.stateChip.className = `state-chip ${step.state}`;
 
   const f = step.features;
   const fc = step.forecast;
   const forecastText = fc.imminent && fc.timeToDangerSec != null
-    ? `Danger in ~${fc.timeToDangerSec.toFixed(1)} s`
-    : fc.projectedLevel === 'danger' ? 'Rising toward danger'
-      : fc.projectedLevel === 'caution' ? 'Trend rising'
-        : fc.slope > 4 ? 'Watchful' : 'Steady';
+    ? `约 ${fc.timeToDangerSec.toFixed(1)} 秒后危险`
+    : fc.projectedLevel === 'danger' ? '趋向危险'
+      : fc.projectedLevel === 'caution' ? '风险上升'
+        : fc.slope > 4 ? '留意' : '平稳';
   const dev = step.baseline.deviation;
   const fitText = !step.baseline.warm
-    ? `Learning you (${Math.round(step.baseline.progress * 100)}%)`
-    : dev.level === 'outside' ? `Unusual: ${FEATURE_NAMES[dev.top[0]] ?? 'movement pattern'}`
-      : 'Matches your usual pattern';
+    ? `正在学习您的基线（${Math.round(step.baseline.progress * 100)}%）`
+    : dev.level === 'outside' ? `与平时不同：${FEATURE_NAMES[dev.top[0]] ?? '步态'}`
+      : '与平时一致';
   const symptomText = step.symptoms.active.length
     ? step.symptoms.active.map((a) => `${a.label} ${Math.round(a.level * 100)}%`).join(' · ')
-    : 'None reported';
+    : '无';
 
   const rows = [
-    ['Body alignment', `${Math.round(f.torsoLean)}° lean`],
-    ['Balance shift', f.lateralOffset > 1 ? 'Outside stance' : 'Centered'],
-    ['Movement speed', f.hipDropSpeed > 0.35 ? 'Rapid drop' : 'Controlled'],
-    ['Prediction', forecastText],
-    ['Personal fit', fitText],
-    ['Symptoms', symptomText],
+    ['姿态', `${Math.round(f.torsoLean)}° 前倾`],
+    ['重心', f.lateralOffset > 1 ? '移出支撑面' : '居中'],
+    ['下降', f.hipDropSpeed > 0.35 ? '快速下坠' : '平稳'],
+    ['预测', forecastText],
+    ['个人基线', fitText],
+    ['症状', symptomText],
   ];
   ui.signals.innerHTML = rows.map(([a, b]) => `<li><span>${a}</span><b>${escapeHtml(String(b))}</b></li>`).join('');
 
@@ -252,7 +260,7 @@ async function startCamera() {
   stopSensor();
   try {
     ui.camera.disabled = true;
-    ui.camera.textContent = 'Loading pose model…';
+    ui.camera.textContent = '正在加载姿态模型…';
     await loadPoseModel();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -266,16 +274,15 @@ async function startCamera() {
     sessionStart = performance.now();
     ui.empty.style.display = 'none';
     ui.live.style.display = 'block';
-    ui.live.innerHTML = '<i></i> LIVE';
-    ui.camera.textContent = 'Camera analysis active';
+    ui.live.innerHTML = '<i></i> 实时';
+    ui.camera.textContent = '相机分析已启用';
     requestAnimationFrame(predictLoop);
   } catch (e) {
     ui.camera.disabled = false;
-    ui.camera.textContent = 'Try camera again';
-    ui.empty.querySelector('h2').textContent = 'Camera unavailable';
-    ui.empty.querySelector('p').textContent = e.message?.includes('Permission')
-      ? 'Allow camera access to continue.'
-      : 'Use a demo scenario while the model or camera is unavailable.';
+    ui.camera.textContent = '重试相机';
+    ui.emptyText.textContent = e.message?.includes('Permission')
+      ? '请允许相机权限后继续。'
+      : '相机或模型暂不可用，可先运行演示场景。';
   }
 }
 
@@ -286,7 +293,7 @@ function stopCamera() {
   ui.video.srcObject = null;
   ui.live.style.display = 'none';
   ui.camera.disabled = false;
-  ui.camera.textContent = 'Start camera analysis';
+  ui.camera.textContent = '启动相机分析';
 }
 
 function startSim() {
@@ -300,8 +307,8 @@ function startSim() {
   mode = 'sim';
   running = true;
   ui.live.style.display = 'block';
-  ui.live.innerHTML = `<i></i> SIM · ${escapeHtml(SCENARIOS[name].label.toUpperCase())}`;
-  ui.demo.textContent = 'Stop scenario';
+  ui.live.innerHTML = `<i></i> 模拟 · ${escapeHtml(SCENARIOS[name].label)}`;
+  ui.demo.textContent = '停止场景';
   demoTimer = setInterval(simTick, 66);
 }
 
@@ -331,7 +338,7 @@ function stopSim() {
     mode = 'idle';
     running = false;
   }
-  ui.demo.textContent = 'Run scenario';
+  ui.demo.textContent = '运行场景';
   ui.live.style.display = 'none';
   if (agent) renderCare(agent.stage(), true); // final, established classification
 }
@@ -344,8 +351,8 @@ function stopSensor() {
     running = false;
     ui.live.style.display = 'none';
   }
-  ui.motion.textContent = 'Use phone motion sensor';
-  ui.ble.textContent = 'Connect BLE band';
+  ui.motion.textContent = '使用手机传感器';
+  ui.ble.textContent = '连接蓝牙手环';
 }
 
 function ingestDeviceObservation(observation) {
@@ -356,11 +363,11 @@ function ingestDeviceObservation(observation) {
   handleStep(step, { throttled: true });
   if (mode !== 'motion' && mode !== 'ble') return;
   const stats = perf.stats();
-  const label = mode === 'motion' ? 'PHONE' : 'BLE';
+  const label = mode === 'motion' ? '手机' : '蓝牙';
   ui.live.innerHTML = `<i></i> ${label} · ${stats.hz.toFixed(0)} Hz · ${stats.p95.toFixed(1)} ms`;
   if (!perf.budgetWarned && perf.ingests.length >= 120 && stats.p95 > DEFAULT_CONFIG.device.maxIngestP95Ms) {
     perf.budgetWarned = true;
-    showToast(`Processing p95 ${stats.p95.toFixed(1)} ms exceeds the ${DEFAULT_CONFIG.device.maxIngestP95Ms} ms budget — reduce UI refresh or sample rate.`);
+    showToast(`处理延迟 p95 ${stats.p95.toFixed(1)} ms 超出 ${DEFAULT_CONFIG.device.maxIngestP95Ms} ms 预算——请降低界面刷新率或采样率。`);
   }
 }
 
@@ -370,7 +377,7 @@ async function startMotion() {
   if (mode === 'camera') stopCamera();
   const permission = await requestMotionPermission();
   if (permission !== 'granted') {
-    showToast('Motion permission denied — allow Motion & Orientation Access and retry.');
+    showToast('未获得运动传感器权限——请在浏览器设置中允许后重试。');
     return;
   }
   startSession();
@@ -381,8 +388,8 @@ async function startMotion() {
   running = true;
   ui.empty.style.display = 'none';
   ui.live.style.display = 'block';
-  ui.live.innerHTML = '<i></i> PHONE · warming up';
-  ui.motion.textContent = 'Phone sensor active';
+  ui.live.innerHTML = '<i></i> 手机 · 正在预热';
+  ui.motion.textContent = '手机传感器已启用';
 }
 
 async function startBle() {
@@ -396,18 +403,18 @@ async function startBle() {
   });
   try {
     ui.ble.disabled = true;
-    ui.ble.textContent = 'Connecting…';
+    ui.ble.textContent = '连接中…';
     await source.connect();
     activeSource = source;
     mode = 'ble';
     running = true;
     ui.empty.style.display = 'none';
     ui.live.style.display = 'block';
-    ui.live.innerHTML = '<i></i> BLE · connected';
-    ui.ble.textContent = 'BLE band streaming';
+    ui.live.innerHTML = '<i></i> 蓝牙 · 已连接';
+    ui.ble.textContent = '蓝牙手环已连接';
   } catch (e) {
-    showToast(`BLE connection failed: ${e.message}`);
-    ui.ble.textContent = 'Connect BLE band';
+    showToast(`蓝牙连接失败：${e.message}`);
+    ui.ble.textContent = '连接蓝牙手环';
   } finally {
     ui.ble.disabled = false;
   }
@@ -417,12 +424,12 @@ ui.camera.onclick = () => { if (mode !== 'camera') startCamera(); };
 ui.demo.onclick = () => { if (mode === 'sim') stopSim(); else startSim(); };
 ui.motion.onclick = () => { if (mode !== 'motion') startMotion(); };
 ui.ble.onclick = () => { if (mode !== 'ble') startBle(); };
-ui.sound.onclick = () => { soundOn = !soundOn; ui.sound.textContent = soundOn ? 'Sound on' : 'Sound off'; };
+ui.sound.onclick = () => { soundOn = !soundOn; ui.sound.textContent = soundOn ? '声音：开' : '声音：关'; };
 ui.chips.addEventListener('click', (event) => {
   const button = event.target.closest('[data-symptom]');
   if (!button) return;
   if (!agent || !running) {
-    showToast('Start monitoring first — check-ins apply to the live session.');
+    showToast('请先开始监测——症状签到仅对当前会话生效。');
     return;
   }
   const result = agent.ingestCheckin({ t: agent.lastT, symptom: button.dataset.symptom, severity: 0.7 });

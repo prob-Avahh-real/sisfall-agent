@@ -109,10 +109,10 @@ export class PatientStager {
 
     const weights = cfg.weights;
     const contributions = [
-      { key: 'episodes', value: weights.episodes * episodeRate, label: `Recent near-fall episodes (${episodeCount})` },
-      { key: 'timeInBand', value: weights.timeInBand * timeInBand, label: 'Sustained time in elevated risk' },
-      { key: 'steadiness', value: weights.steadiness * steadiness, label: 'High gait variability' },
-      { key: 'symptoms', value: weights.symptoms * symptomLoad, label: 'Non-motion symptom load' },
+      { key: 'episodes', value: weights.episodes * episodeRate, label: `近期“差点跌倒” ${episodeCount} 次` },
+      { key: 'timeInBand', value: weights.timeInBand * timeInBand, label: '高风险时段占比偏高' },
+      { key: 'steadiness', value: weights.steadiness * steadiness, label: '步态波动偏大' },
+      { key: 'symptoms', value: weights.symptoms * symptomLoad, label: '非运动症状负担' },
     ];
     const score = Math.round(100 * contributions.reduce((sum, c) => sum + c.value, 0));
 

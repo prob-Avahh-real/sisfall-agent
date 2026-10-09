@@ -75,7 +75,7 @@ test('model scoring is monotonic and coverage-aware', () => {
     'unavailable features contribute neutrally'
   );
   assert.ok(model.score(leanOnly).drivers.length >= 1);
-  assert.ok(model.score(danger).drivers.some((driver) => typeof driver === 'string' && driver.length > 5));
+  assert.ok(model.score(danger).drivers.some((driver) => typeof driver === 'string' && driver.length >= 3));
 });
 
 test('invalid artifact is rejected', () => {

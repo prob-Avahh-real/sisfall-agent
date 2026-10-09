@@ -47,9 +47,9 @@ export class BleImuSource {
   /** Request a device, subscribe to the configured GATT characteristic. */
   async connect() {
     if (!this.bluetooth) {
-      throw new Error('Web Bluetooth is not available in this browser (use Chrome/Edge on desktop or Android)');
+      throw new Error('此浏览器不支持 Web 蓝牙（请使用桌面或安卓版 Chrome/Edge）');
     }
-    this.onStatus?.('Requesting BLE device…');
+    this.onStatus?.('正在请求蓝牙设备…');
     const device = await this.bluetooth.requestDevice({
       filters: [{ services: [this.cfg.serviceUuid] }],
       optionalServices: [this.cfg.serviceUuid],
@@ -61,7 +61,7 @@ export class BleImuSource {
     characteristic.addEventListener('characteristicvaluechanged', this._onNotify);
     this.device = device;
     this.characteristic = characteristic;
-    this.onStatus?.('Connected — streaming IMU samples');
+    this.onStatus?.('已连接——正在接收数据');
     return device;
   }
 

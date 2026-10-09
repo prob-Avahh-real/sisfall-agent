@@ -48,6 +48,6 @@ test('cleared symptoms leave the active set', () => {
 test('advice text exists for every symptom key', () => {
   for (const key of SYMPTOM_KEYS) {
     assert.ok(adviceFor(key, 0).length > 10, key);
-    assert.ok(adviceFor(key, 1200).includes('min'), key);
+    assert.ok(adviceFor(key, 1200).includes('分钟'), key);
   }
 });

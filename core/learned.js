@@ -28,13 +28,13 @@ export const VECTOR_SOURCES = {
 };
 
 export const VECTOR_LABELS = {
-  leanMax: 'Peak forward lean',
-  leanMean: 'Sustained lean',
-  leanRate: 'Rapid lean onset',
-  offsetMax: 'Balance shifted outside stance',
-  dropMax: 'Rapid downward movement',
-  dropMean: 'Sustained lowering',
-  asymMax: 'Uneven lower-body loading',
+  leanMax: '前倾峰值',
+  leanMean: '持续前倾',
+  leanRate: '快速前倾',
+  offsetMax: '重心移出支撑面',
+  dropMax: '快速下坠',
+  dropMean: '持续下降',
+  asymMax: '下肢负重不均',
 };
 
 const finite = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -139,7 +139,7 @@ export class LearnedRiskModel {
       score: Math.round(probability * 100),
       probability,
       contributions,
-      drivers: drivers.length ? drivers : ['Pattern within usual walking range'],
+      drivers: drivers.length ? drivers : ['步态模式正常'],
     };
   }
 }

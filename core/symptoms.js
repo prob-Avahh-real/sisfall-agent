@@ -19,33 +19,33 @@ import { DEFAULT_CONFIG } from './config.js';
 export const SYMPTOM_KEYS = ['dizziness', 'fatigue', 'sleepDebt', 'anxiety', 'pain', 'medicationOff'];
 
 export const SYMPTOM_LABELS = {
-  dizziness: 'Dizziness',
-  fatigue: 'Fatigue',
-  sleepDebt: 'Poor sleep',
-  anxiety: 'Anxiety',
-  pain: 'Pain',
-  medicationOff: 'Medication wearing off',
+  dizziness: '头晕',
+  fatigue: '疲劳',
+  sleepDebt: '睡眠不足',
+  anxiety: '焦虑',
+  pain: '疼痛',
+  medicationOff: '药效减退',
 };
 
 /** Actionable guidance shown when a check-in is recorded. */
 export function adviceFor(symptom, windowRemainingSec = 0) {
   const windowNote =
-    windowRemainingSec > 60 ? ` Heightened watch for about ${Math.round(windowRemainingSec / 60)} min.` : '';
+    windowRemainingSec > 60 ? `（高度关注约 ${Math.round(windowRemainingSec / 60)} 分钟）` : '';
   switch (symptom) {
     case 'dizziness':
-      return `Sit down and hold support now. SisFall will warn earlier while this lasts.${windowNote}`;
+      return `请立即坐下并扶稳。症状持续期间 SisFall 会更早预警。${windowNote}`;
     case 'fatigue':
-      return `Consider resting before continuing on your feet.${windowNote}`;
+      return `建议先休息，再继续行走。${windowNote}`;
     case 'sleepDebt':
-      return `Low sleep raises fall risk today. Take routes and paces with margin.${windowNote}`;
+      return `睡眠不足会提高当日跌倒风险。路线与步速都留出余量。${windowNote}`;
     case 'anxiety':
-      return `Slow your steps and widen your stance; the agent will be more sensitive for a while.${windowNote}`;
+      return `放慢脚步、加宽站距；智能体在一段时间内会更敏感。${windowNote}`;
     case 'pain':
-      return `Move carefully — thresholds are temporarily stricter.${windowNote}`;
+      return `请小心移动——当前阈值已临时收紧。${windowNote}`;
     case 'medicationOff':
-      return `Medication wearing off can increase symptom risk. Take it slow until the next dose.${windowNote}`;
+      return `药效减退可能增加症状风险。下次服药前请放慢节奏。${windowNote}`;
     default:
-      return `Noted. The agent will factor this in.${windowNote}`;
+      return `已记录，智能体会将其纳入评估。${windowNote}`;
   }
 }
 

@@ -12,10 +12,10 @@ would need to judge, plus current scenario metrics.
 
 ## Risk features & bands (`config.risk`)
 
-- **Torso leaning beyond the base of support** — weight 0.31, pressure 0 at 8, saturates at 50
-- **Center of mass shifting outside stance** — weight 0.29, pressure 0 at 0.35, saturates at 2
-- **Rapid downward hip movement** — weight 0.29, pressure 0 at 0, saturates at 0.9
-- **Uneven lower-body loading** — weight 0.11, pressure 0 at 0, saturates at 0.18
+- **躯干前倾超出支撑面** — weight 0.31, pressure 0 at 8, saturates at 50
+- **重心偏移出站立面** — weight 0.29, pressure 0 at 0.35, saturates at 2
+- **髋部快速下坠** — weight 0.29, pressure 0 at 0, saturates at 0.9
+- **下肢负重不均** — weight 0.11, pressure 0 at 0, saturates at 0.18
 - Bands: caution ≥ 42, danger ≥ 72 (0-100 scale)
 - Coverage discounts: measured 1, proxy 0.6, unavailable 0
 
@@ -32,22 +32,22 @@ would need to judge, plus current scenario metrics.
 
 ## Symptom model (`config.symptoms`)
 
-- **Dizziness** — half-life 10 min, effective-score boost 25 (cap 35), forecast horizon ×1.5
-- **Fatigue** — half-life 60 min, effective-score boost 12 (cap 35), forecast horizon ×1.25
-- **Poor sleep** — half-life 360 min, effective-score boost 8 (cap 35), forecast horizon ×1.1
-- **Anxiety** — half-life 30 min, effective-score boost 8 (cap 35), forecast horizon ×1.1
-- **Pain** — half-life 60 min, effective-score boost 10 (cap 35), forecast horizon ×1.1
-- **Medication wearing off** — half-life 120 min, effective-score boost 15 (cap 35), forecast horizon ×1.3
+- **头晕** — half-life 10 min, effective-score boost 25 (cap 35), forecast horizon ×1.5
+- **疲劳** — half-life 60 min, effective-score boost 12 (cap 35), forecast horizon ×1.25
+- **睡眠不足** — half-life 360 min, effective-score boost 8 (cap 35), forecast horizon ×1.1
+- **焦虑** — half-life 30 min, effective-score boost 8 (cap 35), forecast horizon ×1.1
+- **疼痛** — half-life 60 min, effective-score boost 10 (cap 35), forecast horizon ×1.1
+- **药效减退** — half-life 120 min, effective-score boost 15 (cap 35), forecast horizon ×1.3
 - Stage floors: dizziness ≥ 0.6 ⇒ stage ≥ 2; any ≥ 0.5 ⇒ stage ≥ 1
 
 ## Staging (`config.staging`)
 
 - Evidence window 15 min; weights (episodes/time-in-band/gait-variability/symptoms): 0.3 / 0.3 / 0.35 / 0.05
 - Thresholds: guarded ≥ 25, fragile ≥ 50, high-risk ≥ 75; provisional under 40 s of evidence
-- **Stage 0 · Steady** — No meaningful instability detected in this window. Review cadence: 7 day(s).
-- **Stage 1 · Guarded** — Early instability signs — worth acting on now. Review cadence: 3 day(s).
-- **Stage 2 · Fragile** — Clear fall-risk pattern — act with support. Review cadence: 2 day(s).
-- **Stage 3 · High risk** — Sustained high risk — escalation advised. Review cadence: 1 day(s). Recommends professional contact.
+- **0 级 · 平稳** — 本时间段内未见明显不稳定。 Review cadence: 7 day(s).
+- **1 级 · 需留意** — 出现早期不稳定迹象，值得现在就处理。 Review cadence: 3 day(s).
+- **2 级 · 脆弱** — 明显的跌倒风险模式——请在支持下行动。 Review cadence: 2 day(s).
+- **3 级 · 高风险** — 持续高风险——建议升级处理。 Review cadence: 1 day(s). Recommends professional contact.
 
 ## Scenario evaluation (rules path, seeds 1-6)
 

@@ -80,15 +80,15 @@ test('symptom-boosted caution names the symptom', () => {
   const symptoms = { boost: 20, top: 'dizziness', topLabel: 'Dizziness', active: [] };
   const out = decide(createPolicyState(0), { risk: riskAt(45, 'caution'), symptoms });
   assert.equal(out.state, 'caution');
-  assert.ok(out.actions.some((a) => (a.reason ?? '').includes('Symptom context')));
-  assert.ok(out.actions.some((a) => a.text.includes('dizziness')));
+  assert.ok(out.actions.some((a) => (a.reason ?? '').includes('症状背景')));
+  assert.ok(out.actions.some((a) => a.text.includes('头晕')));
 });
 
 test('unusual-for-you deviation nudges at a modest absolute score', () => {
   const devBaseline = { warm: true, progress: 1, deviation: { level: 'outside', score: 0.6, z: {}, top: ['torsoLean'] } };
   const out = decide(createPolicyState(0), { risk: riskAt(18, 'stable'), baseline: devBaseline });
   assert.equal(out.state, 'caution');
-  assert.ok(out.actions.some((a) => a.reason === 'Unusual for you'));
+  assert.ok(out.actions.some((a) => a.reason === '与您平时不同'));
 
   const low = decide(createPolicyState(0), { risk: riskAt(10, 'stable'), baseline: devBaseline });
   assert.equal(low.state, 'stable');

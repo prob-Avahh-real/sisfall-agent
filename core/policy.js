@@ -29,17 +29,17 @@ export function createPolicyState(now = 0) {
 
 function instructionFor(drivers = [], forecast = {}, cause = '', symptoms = null) {
   if (symptoms && symptoms.top === 'dizziness' && cause !== 'deviation') {
-    return 'You reported dizziness. Sit down and hold a stable surface now.';
+    return '您报告了头晕。请立即坐下并扶稳。';
   }
-  if (cause === 'symptom') return `You reported ${symptoms?.topLabel ?? 'a symptom'}. Slow down and steady yourself.`;
-  if (cause === 'deviation') return 'Your movement pattern changed from your usual walk. Take a steadying pause.';
+  if (cause === 'symptom') return `您报告了${symptoms?.topLabel ?? '症状'}。请放慢速度，稳住身体。`;
+  if (cause === 'deviation') return '您的步态与平时不同。请暂停片刻，稳住身体。';
   const top = drivers[0] ?? '';
-  if (top === FEATURE_LABELS.hipDropSpeed) return 'Rapid lowering detected. Hold a stable surface now.';
-  if (top === FEATURE_LABELS.torsoLean) return 'You are leaning past your balance point. Straighten up or sit down.';
-  if (top === FEATURE_LABELS.lateralOffset) return 'Shift your weight back over your feet.';
-  if (top === FEATURE_LABELS.kneeAsymmetry) return 'Even out your stance.';
-  if (forecast.drivers && forecast.drivers.length) return 'Balance is trending unstable. Pause and steady yourself.';
-  return 'Pause and steady yourself.';
+  if (top === FEATURE_LABELS.hipDropSpeed) return '检测到快速下坠。请立即扶稳。';
+  if (top === FEATURE_LABELS.torsoLean) return '身体前倾超过平衡点。请站直或坐下。';
+  if (top === FEATURE_LABELS.lateralOffset) return '请将重心移回双脚上方。';
+  if (top === FEATURE_LABELS.kneeAsymmetry) return '请均衡站立重心。';
+  if (forecast.drivers && forecast.drivers.length) return '平衡呈恶化趋势。请暂停并稳住身体。';
+  return '请暂停并稳住身体。';
 }
 
 /**
@@ -125,11 +125,11 @@ export function decidePolicy(policy, input, config = DEFAULT_CONFIG) {
         },
         { force: true }
       );
-      emit({ kind: 'audio', urgency: 'high', text: 'warning tone', reason: 'Predicted balance loss' }, { force: true });
+      emit({ kind: 'audio', urgency: 'high', text: '警告音', reason: '预测将失衡' }, { force: true });
       nextPolicy.lastReminderAt.imminent = now;
     } else if (next === 'danger') {
       emit({ kind: 'instruction', urgency: 'high', text: instructionFor(risk.drivers, forecast, 'acute', symptoms), reason: risk.drivers[0] });
-      emit({ kind: 'audio', urgency: 'high', text: 'warning tone', reason: 'Dangerous posture now' });
+      emit({ kind: 'audio', urgency: 'high', text: '警告音', reason: '当前姿态危险' });
       nextPolicy.lastReminderAt.danger = now;
     } else if (next === 'caution') {
       emit({
@@ -140,23 +140,23 @@ export function decidePolicy(policy, input, config = DEFAULT_CONFIG) {
             ? instructionFor(risk.drivers, forecast, 'deviation')
             : cautionCause === 'symptom'
               ? instructionFor(risk.drivers, forecast, 'symptom', symptoms)
-              : 'Slow down and steady yourself.',
+              : '请放慢速度，稳住身体。',
         reason:
           cautionCause === 'deviation'
-            ? 'Unusual for you'
+            ? '与您平时不同'
             : cautionCause === 'symptom'
-              ? `Symptom context: ${symptoms?.topLabel ?? 'reported symptom'}`
-              : risk.drivers[0] ?? 'Caution band',
+              ? `症状背景：${symptoms?.topLabel ?? '已报告症状'}`
+              : risk.drivers[0] ?? '注意区间',
       });
     } else if (next === 'recovering') {
-      emit({ kind: 'visual', urgency: 'low', text: 'Recovered — good.', reason: 'Risk receded' });
+      emit({ kind: 'visual', urgency: 'low', text: '已恢复，很好。', reason: '风险消退' });
     }
   } else if (ACUTE.has(next)) {
     // Persisting acute state: re-issue at a calm cadence, cooldown still applies.
     const lastRemind = nextPolicy.lastReminderAt[next] ?? -Infinity;
     if (now - lastRemind >= cfg.reminderIntervalSec) {
-      emit({ kind: 'instruction', urgency: 'high', text: instructionFor(risk.drivers, forecast, 'acute', symptoms), reason: 'Risk persisting' });
-      emit({ kind: 'audio', urgency: 'high', text: 'warning tone', reason: 'Risk persisting' });
+      emit({ kind: 'instruction', urgency: 'high', text: instructionFor(risk.drivers, forecast, 'acute', symptoms), reason: '风险持续' });
+      emit({ kind: 'audio', urgency: 'high', text: '警告音', reason: '风险持续' });
       nextPolicy.lastReminderAt[next] = now;
     }
   }

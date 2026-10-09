@@ -82,5 +82,5 @@ test('connect() uses the configured GATT UUIDs and subscribes to notifications',
 
 test('connect() without Web Bluetooth rejects with a clear error', async () => {
   const source = new BleImuSource({ bluetooth: null });
-  await assert.rejects(() => source.connect(), /Web Bluetooth is not available/);
+  await assert.rejects(() => source.connect(), /不支持 Web 蓝牙/);
 });

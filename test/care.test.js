@@ -17,19 +17,19 @@ test('stage 3 escalates; lower stages do not', () => {
 });
 
 test('symptom addon is appended with rationale', () => {
-  const plan = carePlan({ stage: 1 }, { symptoms: { top: 'dizziness', topLabel: 'Dizziness' } });
-  assert.ok(plan.advice.some((a) => (a.rationale ?? '').includes('Dizziness')));
+  const plan = carePlan({ stage: 1 }, { symptoms: { top: 'dizziness', topLabel: '头晕' } });
+  assert.ok(plan.advice.some((a) => (a.rationale ?? '').includes('头晕')));
 });
 
 test('recent near-fall adds trigger-removal advice below stage 2', () => {
   const plan = carePlan({ stage: 1 }, { episodeCount: 1 });
-  assert.ok(plan.advice.some((a) => a.text.includes('near-fall')));
+  assert.ok(plan.advice.some((a) => a.text.includes('差点跌倒')));
   const higher = carePlan({ stage: 2 }, { episodeCount: 1 });
-  assert.ok(!higher.advice.some((a) => a.text.includes('near-fall')));
+  assert.ok(!higher.advice.some((a) => a.text.includes('差点跌倒')));
 });
 
 test('plan carries through staging drivers and provisional flag', () => {
-  const plan = carePlan({ stage: 2, provisional: true, drivers: ['High gait variability'] });
+  const plan = carePlan({ stage: 2, provisional: true, drivers: ['步态波动偏大'] });
   assert.equal(plan.provisional, true);
-  assert.deepEqual(plan.drivers, ['High gait variability']);
+  assert.deepEqual(plan.drivers, ['步态波动偏大']);
 });

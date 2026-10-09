@@ -45,7 +45,7 @@ test('coverage: unavailable features drop out and weights renormalize', () => {
 
 test('drivers name the dominant pressures', () => {
   const result = assessRisk({ torsoLean: 55, lateralOffset: 0, hipDropSpeed: 0, kneeAsymmetry: 0 });
-  assert.ok(result.drivers[0].includes('Torso leaning'));
+  assert.ok(result.drivers[0].includes('躯干前倾'));
 });
 
 test('measured coverage keeps the original score scale', () => {

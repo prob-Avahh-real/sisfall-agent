@@ -37,17 +37,17 @@ export function nearFallSeverity(t, { start = 8, ramp = 2.6, hold = 0.8, recover
 }
 
 export const SCENARIOS = {
-  stable: { label: 'Stable walk', durationSec: 60, hz: 15 },
-  wobble: { label: 'Unsteady walk', durationSec: 90, hz: 15 },
-  'wobble-shift': { label: 'Sudden gait change', durationSec: 90, hz: 15 },
+  stable: { label: '平稳行走', durationSec: 60, hz: 15 },
+  wobble: { label: '不稳行走', durationSec: 90, hz: 15 },
+  'wobble-shift': { label: '步态突变', durationSec: 90, hz: 15 },
   'dizzy-walk': {
-    label: 'Moderate walk after a dizziness check-in',
+    label: '头晕步态（含签到）',
     durationSec: 60,
     hz: 15,
     checkins: [{ t: 5, symptom: 'dizziness', severity: 1.0 }],
   },
-  'near-fall': { label: 'Near-fall', durationSec: 18, hz: 15 },
-  'imu-near-fall': { label: 'Near-fall (IMU)', durationSec: 16, hz: 50 },
+  'near-fall': { label: '差点跌倒', durationSec: 18, hz: 15 },
+  'imu-near-fall': { label: '差点跌倒（IMU 通道）', durationSec: 16, hz: 50 },
 };
 
 function poseFrames(name, { hz, durationSec, seed }) {

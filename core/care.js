@@ -10,63 +10,63 @@ export const STAGE_DEFINITIONS = [
   {
     stage: 0,
     key: 'steady',
-    label: 'Stage 0 · Steady',
-    summary: 'No meaningful instability detected in this window.',
+    label: '0 级 · 平稳',
+    summary: '本时间段内未见明显不稳定。',
     reviewInDays: 7,
     advice: [
-      { kind: 'activity', text: 'Keep walking 20–30 minutes most days to maintain strength and balance.' },
-      { kind: 'monitoring', text: 'Stay checked in — the agent keeps re-assessing in the background.' },
+      { kind: 'activity', text: '坚持每天步行 20–30 分钟，维持力量与平衡。' },
+      { kind: 'monitoring', text: '保持签到——智能体在后台持续评估。' },
     ],
   },
   {
     stage: 1,
     key: 'guarded',
-    label: 'Stage 1 · Guarded',
-    summary: 'Early instability signs — worth acting on now.',
+    label: '1 级 · 需留意',
+    summary: '出现早期不稳定迹象，值得现在就处理。',
     reviewInDays: 3,
     advice: [
-      { kind: 'activity', text: 'Add a short balance routine most days (heel-to-toe standing, slow sit-to-stand ×5).' },
-      { kind: 'environment', text: 'Review footwear, rugs, and lighting along your usual routes.' },
-      { kind: 'monitoring', text: 'Keep SisFall active during walks; treat caution cues as real.' },
+      { kind: 'activity', text: '每天加入简短平衡练习（脚跟对脚尖站立、慢速坐起 ×5）。' },
+      { kind: 'environment', text: '检查常用路线的鞋具、地毯与照明。' },
+      { kind: 'monitoring', text: '行走时保持 SisFall 运行；认真对待“注意”提示。' },
     ],
   },
   {
     stage: 2,
     key: 'fragile',
-    label: 'Stage 2 · Fragile',
-    summary: 'Clear fall-risk pattern — act with support.',
+    label: '2 级 · 脆弱',
+    summary: '明显的跌倒风险模式——请在支持下行动。',
     reviewInDays: 2,
     advice: [
-      { kind: 'activity', text: 'Walk with support (rail, stick, or companion); avoid uneven ground and dim light.' },
-      { kind: 'environment', text: 'Add grab bars and night lights; clear loose cables from walkways.' },
-      { kind: 'clinical', text: 'Ask a physiotherapist about a strength-and-balance program.' },
-      { kind: 'monitoring', text: 'Accompanied walks preferred; check in twice a day.' },
+      { kind: 'activity', text: '在支撑下行走（扶手、手杖或有人陪同）；避免不平整地面与昏暗光线。' },
+      { kind: 'environment', text: '加装扶手与夜灯；清理走道上的松散线缆。' },
+      { kind: 'clinical', text: '咨询康复治疗师，制定力量与平衡训练方案。' },
+      { kind: 'monitoring', text: '建议有人陪同行走；每天签到两次。' },
     ],
   },
   {
     stage: 3,
     key: 'high-risk',
-    label: 'Stage 3 · High risk',
-    summary: 'Sustained high risk — escalation advised.',
+    label: '3 级 · 高风险',
+    summary: '持续高风险——建议升级处理。',
     reviewInDays: 1,
     escalation: true,
     advice: [
-      { kind: 'clinical', text: 'Contact your clinician about the recent instability; bring the session journal.' },
-      { kind: 'care', text: 'Inform a caregiver or emergency contact about this period.' },
-      { kind: 'activity', text: 'Limit solo walking; use the prescribed assistive device.' },
-      { kind: 'monitoring', text: 'Continuous monitoring and immediate alarm enabled.' },
+      { kind: 'clinical', text: '联系您的医生，说明近期不稳定情况，并带上会话日志。' },
+      { kind: 'care', text: '告知照护者或紧急联系人近期情况。' },
+      { kind: 'activity', text: '避免独自行走；使用医嘱辅具。' },
+      { kind: 'monitoring', text: '保持持续监测，即时告警已开启。' },
     ],
   },
 ];
 
 // Symptom-driven additions appended to whatever the stage plan says.
 const SYMPTOM_ADDONS = {
-  dizziness: { kind: 'activity', text: 'Dizziness active — stand up slowly and pause between position changes.' },
-  fatigue: { kind: 'activity', text: 'Fatigue active — schedule rests before you feel you need them.' },
-  sleepDebt: { kind: 'activity', text: 'Low sleep raises today’s risk — keep walks short and familiar.' },
-  anxiety: { kind: 'monitoring', text: 'Anxiety active — slower steps and a wider stance help stability.' },
-  pain: { kind: 'activity', text: 'Pain active — avoid loading the painful side during turns.' },
-  medicationOff: { kind: 'clinical', text: 'Medication may be wearing off — note the timing of instability for your clinician.' },
+  dizziness: { kind: 'activity', text: '头晕期间——起身放慢，变换体位之间稍作停顿。' },
+  fatigue: { kind: 'activity', text: '疲劳期间——在感到需要之前安排休息。' },
+  sleepDebt: { kind: 'activity', text: '睡眠不足会提高当日风险——步行尽量短而熟悉。' },
+  anxiety: { kind: 'monitoring', text: '焦虑期间——放慢步频、加宽站距有助于稳定。' },
+  pain: { kind: 'activity', text: '疼痛期间——转身时避免让患侧过度受力。' },
+  medicationOff: { kind: 'clinical', text: '药效可能减退——请记录不稳定的时间点，供医生参考。' },
 };
 
 /**
@@ -79,13 +79,13 @@ export function carePlan(staged, { symptoms = null, episodeCount = 0 } = {}) {
   const advice = definition.advice.map((item) => ({ ...item }));
 
   if (symptoms && symptoms.top && SYMPTOM_ADDONS[symptoms.top]) {
-    advice.push({ ...SYMPTOM_ADDONS[symptoms.top], rationale: `Reported: ${symptoms.topLabel}` });
+    advice.push({ ...SYMPTOM_ADDONS[symptoms.top], rationale: `已报告：${symptoms.topLabel}` });
   }
   if (episodeCount > 0 && definition.stage < 2) {
     advice.push({
       kind: 'monitoring',
-      text: 'A recent near-fall was recorded — remove its trigger (that spot, that time of day, that pace).',
-      rationale: 'Near-falls predict future falls.',
+      text: '检测到近期一次“差点跌倒”——请排查诱因（地点、时段、步速）。',
+      rationale: '“差点跌倒”可预示未来跌倒。',
     });
   }
 

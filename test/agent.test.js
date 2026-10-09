@@ -68,7 +68,7 @@ test('sudden gait change: caught as unusual-for-you without acute escalation', (
   const { agent, transitions } = runScenarioWithAgent('wobble-shift');
   const deviationEntry = agent.journal
     .byType('action')
-    .find((a) => a.reason === 'Unusual for you');
+    .find((a) => a.reason === '与您平时不同');
   assert.ok(deviationEntry, 'deviation nudge fired after the shift');
   assert.ok(deviationEntry.t >= 30, `nudge at ${deviationEntry.t}s after the shift at 30s`);
   assert.ok(!transitions.some((tr) => ['danger', 'imminent'].includes(tr.to)));
@@ -99,9 +99,9 @@ test('dizziness check-in fuses into risk; identical walk stays silent without it
 
   const symptomActions = withSymptoms.agent.journal
     .byType('action')
-    .filter((a) => (a.reason ?? '').includes('Symptom context'));
+    .filter((a) => (a.reason ?? '').includes('症状背景'));
   assert.ok(symptomActions.length >= 1);
-  assert.ok(/dizziness/i.test(symptomActions[0].text));
+  assert.ok(/头晕/.test(symptomActions[0].text));
 
   // Check-in journaled; staging applies the dizziness floor.
   assert.equal(withSymptoms.agent.journal.byType('checkin').length, 1);

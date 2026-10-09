@@ -18,10 +18,10 @@ export const FEATURE_KEYS = ['torsoLean', 'lateralOffset', 'hipDropSpeed', 'knee
 export const COVERAGE_LEVELS = ['measured', 'proxy', 'unavailable'];
 
 export const FEATURE_LABELS = {
-  torsoLean: 'Torso leaning beyond the base of support',
-  lateralOffset: 'Center of mass shifting outside stance',
-  hipDropSpeed: 'Rapid downward hip movement',
-  kneeAsymmetry: 'Uneven lower-body loading',
+  torsoLean: '躯干前倾超出支撑面',
+  lateralOffset: '重心偏移出站立面',
+  hipDropSpeed: '髋部快速下坠',
+  kneeAsymmetry: '下肢负重不均',
 };
 
 /**

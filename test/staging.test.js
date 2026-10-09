@@ -43,7 +43,7 @@ test('unsteady walk stages as guarded from gait variability', () => {
   const r = s.result();
   assert.equal(r.stage, 1);
   assert.ok(r.evidence.steadiness > 0.8);
-  assert.ok(r.drivers.some((d) => d.includes('variability')));
+  assert.ok(r.drivers.some((d) => d.includes('波动')));
 });
 
 test('sustained acute session with episodes stages as high risk', () => {
@@ -66,9 +66,9 @@ test('fresh dizziness floors the stage regardless of calm gait', () => {
   const s = new PatientStager();
   const symptomCtx = {
     levels: { dizziness: 0.8 },
-    active: [{ key: 'dizziness', label: 'Dizziness', level: 0.8 }],
+    active: [{ key: 'dizziness', label: '头晕', level: 0.8 }],
     top: 'dizziness',
-    topLabel: 'Dizziness',
+    topLabel: '头晕',
   };
   feed(s, 120, () => ({ lean: 7, offset: 0.34, symptoms: symptomCtx }));
   const r = s.result();
