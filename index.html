@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#071815" />
+  <title>SteadyStep — Fall-risk posture agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brandmark">S</span> SteadyStep</a>
+    <div class="privacy"><span></span> On-device analysis · No video uploaded</div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="eyebrow">REAL-TIME POSTURE INTELLIGENCE</p>
+      <h1>See instability<br><em>before a fall.</em></h1>
+      <p class="lede">A camera- and sensor-based agent that watches movement patterns, predicts dangerous postures before they become falls, factors in symptoms you report, and stages the pattern into actionable care.</p>
+    </section>
+
+    <section class="monitor" aria-label="Live posture monitor">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="empty" id="emptyState">
+          <div class="radar"><span></span><span></span><span></span><div class="person">●<i></i><b></b></div></div>
+          <h2>Ready to observe</h2>
+          <p>Stand where your full body is visible, or run a scenario.</p>
+        </div>
+        <div class="live-badge" id="liveBadge"><i></i> LIVE</div>
+        <div class="alert" id="alertBox"><strong>High fall risk</strong><span id="alertAdvice">Please sit down or hold a stable surface.</span></div>
+        <div class="nudge" id="nudgeBox"><span id="nudgeText"></span></div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </div>
+
+      <aside class="panel">
+        <div class="panel-head"><span>RISK ASSESSMENT</span><span class="state-chip calibrating" id="stateChip">BOOT</span><button id="soundBtn" aria-label="Toggle sound">Sound on</button></div>
+        <div class="gauge" id="gauge" style="--score: 0">
+          <div><strong id="score">0</strong><small>/ 100</small></div>
+        </div>
+        <div class="risk-label stable" id="riskLabel"><i></i><span><b>Stable</b><small>Posture looks balanced</small></span></div>
+        <div class="signals">
+          <h3>What the agent sees</h3>
+          <ul id="signals">
+            <li><span>Body alignment</span><b>Waiting</b></li>
+            <li><span>Balance shift</span><b>Waiting</b></li>
+            <li><span>Movement speed</span><b>Waiting</b></li>
+            <li><span>Prediction</span><b>Waiting</b></li>
+            <li><span>Personal fit</span><b>Learning</b></li>
+            <li><span>Symptoms</span><b>None reported</b></li>
+          </ul>
+        </div>
+
+        <div class="checkins">
+          <h3>Report a symptom</h3>
+          <div class="chips" id="checkinChips">
+            <button data-symptom="dizziness" aria-label="Report dizziness">Dizzy</button>
+            <button data-symptom="fatigue" aria-label="Report fatigue">Tired</button>
+            <button data-symptom="sleepDebt" aria-label="Report poor sleep">Poor sleep</button>
+            <button data-symptom="anxiety" aria-label="Report anxiety">Anxious</button>
+            <button data-symptom="pain" aria-label="Report pain">Pain</button>
+            <button data-symptom="medicationOff" aria-label="Report medication wearing off">Meds off</button>
+          </div>
+        </div>
+
+        <div class="care">
+          <h3>Care plan</h3>
+          <p class="care-label" id="careLabel">Gathering evidence…</p>
+          <ul id="careAdvice"></ul>
+        </div>
+
+        <div class="actions">
+          <button class="primary" id="cameraBtn">Start camera analysis</button>
+          <div class="sim-controls">
+            <select id="scenario" aria-label="Demo scenario">
+              <option value="stable">Stable walk</option>
+              <option value="wobble">Unsteady walk</option>
+              <option value="wobble-shift">Sudden gait change</option>
+              <option value="dizzy-walk">Dizzy walk + check-in</option>
+              <option value="near-fall" selected>Near-fall</option>
+              <option value="imu-near-fall">Near-fall (IMU path)</option>
+            </select>
+            <button class="secondary" id="demoBtn">Run scenario</button>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="obstacle" /> Nearby obstacle or slippery floor</label>
+      </aside>
+    </section>
+
+    <section class="how">
+      <div><p class="eyebrow">HOW IT THINKS</p><h2>Not just detection.<br>Early intervention.</h2></div>
+      <ol><li><b>01</b><strong>Observe</strong><span>Maps body landmarks locally, or reads IMU samples from a wearable path.</span></li><li><b>02</b><strong>Reason</strong><span>Truth-checks posture against your personal baseline, predicts where it is heading, and factors in symptoms.</span></li><li><b>03</b><strong>Act &amp; stage</strong><span>Warns before danger, then classifies the pattern into a stage with matched care advice.</span></li></ol>
+    </section>
+    <p class="disclaimer">Prototype only — not a medical device or emergency service. It may miss falls or raise false alarms. Keep normal fall-prevention measures in place.</p>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
