@@ -7,6 +7,7 @@ import { DevicemotionSource, requestMotionPermission } from './sources/devicemot
 import { BleImuSource } from './sources/web-bluetooth.js';
 import { matchVoiceCommand, isScheduleDue, isDoseDue, dayKey } from './core/training.js';
 import { DEFAULT_BPM, clampBpm, breathPhaseAt } from './core/music.js';
+import { BaduanjinSession, scoreMove, aggregateScores } from './core/baduanjin.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -23,6 +24,9 @@ const ui = {
   scheduleOn: $('scheduleOn'), scheduleTime: $('scheduleTime'), scheduleState: $('scheduleState'),
   medOn: $('medOn'), medTime1: $('medTime1'), medTime2: $('medTime2'), medState: $('medState'),
   musicOn: $('musicOn'), musicMode: $('musicMode'), musicBpm: $('musicBpm'), musicState: $('musicState'),
+  baduanjinBtn: $('baduanjinBtn'), baduanjinStatus: $('baduanjinStatus'), baduanjinNow: $('baduanjinNow'),
+  baduanjinMove: $('baduanjinMove'), baduanjinRemain: $('baduanjinRemain'), baduanjinProgress: $('baduanjinProgress'),
+  baduanjinCue: $('baduanjinCue'), baduanjinScore: $('baduanjinScore'),
   careLabel: $('careLabel'), careAdvice: $('careAdvice'), chips: $('checkinChips'),
 };
 
@@ -236,18 +240,55 @@ function drawPose(points) {
   c.width = ui.video.videoWidth;
   c.height = ui.video.videoHeight;
   ctx.clearRect(0, 0, c.width, c.height);
-  ctx.strokeStyle = '#70e0b7';
+  // 全身动线：跟练时绘制双腕与髋中最近约 4 秒的轨迹（越旧越淡）
+  if (baduanjin) {
+    const trails = [
+      { list: skeletonTrails.wristL, color: '#3a5a99' },
+      { list: skeletonTrails.wristR, color: '#3a5a99' },
+      { list: skeletonTrails.hip, color: '#d9822b' },
+    ];
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 0;
+    for (const trail of trails) {
+      const list = trail.list;
+      if (list.length < 2) continue;
+      ctx.strokeStyle = trail.color;
+      for (let i = 1; i < list.length; i += 1) {
+        ctx.globalAlpha = (i / list.length) * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(list[i - 1].x * c.width, list[i - 1].y * c.height);
+        ctx.lineTo(list[i].x * c.width, list[i].y * c.height);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 火柴人染色：跟练模式按评分要素的达标状态着色（绿=达标/黄=接近/灰=偏离）
+  const jointStates = baduanjin?.jointStates ?? null;
+  const JOINT_COLORS = { ok: '#2f9e6e', near: '#d9822b', off: '#8a8a8a' };
+  const boneColor = (a, b) => {
+    if (!jointStates) return '#70e0b7';
+    const stateA = jointStates[a];
+    const stateB = jointStates[b];
+    if (stateA && stateA === stateB) return JOINT_COLORS[stateA];
+    if (stateA === 'ok' || stateB === 'ok') return JOINT_COLORS.ok;
+    if (stateA || stateB) return JOINT_COLORS[stateA ?? stateB];
+    return '#70e0b7';
+  };
   ctx.lineWidth = 4;
   ctx.shadowBlur = 10;
-  ctx.shadowColor = '#70e0b7';
   connections.forEach(([a, b]) => {
+    const color = boneColor(a, b);
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
     ctx.beginPath();
     ctx.moveTo(points[a].x * c.width, points[a].y * c.height);
     ctx.lineTo(points[b].x * c.width, points[b].y * c.height);
     ctx.stroke();
   });
-  ctx.fillStyle = '#effff8';
-  points.forEach((p) => {
+  points.forEach((p, index) => {
+    ctx.fillStyle = jointStates?.[index] ? JOINT_COLORS[jointStates[index]] : '#effff8';
     ctx.beginPath();
     ctx.arc(p.x * c.width, p.y * c.height, 4, 0, Math.PI * 2);
     ctx.fill();
@@ -268,6 +309,7 @@ function predictLoop() {
       const observation = poseObservation(points, previousPose, dt, t);
       previousPose = observation.debug;
       previousAt = now;
+      if (baduanjin) baduanjinTick(points, now);
       const step = agent.ingest(observation);
       handleStep(step);
     }
@@ -734,6 +776,138 @@ ui.musicOn.onchange = () => {
 };
 ui.musicMode.onchange = applyMusicSettings;
 ui.musicBpm.onchange = applyMusicSettings;
+
+// --- 八段锦跟练：火柴人全身跟踪 + 逐帧打分 + 动线轨迹 ----------------------
+// 评分反馈（幅度/对称/稳定）不是医疗评估；跟练期间 agent 走 practice
+// 语义（暂缓注意级提示，预警/危险不降级）。
+let baduanjin = null;
+let skeletonTrails = { wristL: [], wristR: [], hip: [] };
+
+function pushTrail(point, list) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+  list.push({ x: point.x, y: point.y });
+  if (list.length > 90) list.shift(); // 约 4 秒 @ 22fps
+}
+
+function baduanjinTick(points, now) {
+  if (!baduanjin) return;
+  const current = baduanjin.session.currentAt(now);
+  if (current.phase === 'done') {
+    finishBaduanjin(true);
+    return;
+  }
+  // 动线采样：双腕与髋中
+  pushTrail(points[15], skeletonTrails.wristL);
+  pushTrail(points[16], skeletonTrails.wristR);
+  const hipL = points[23];
+  const hipR = points[24];
+  if (hipL && hipR) pushTrail({ x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 }, skeletonTrails.hip);
+
+  if (current.phase !== 'move') {
+    // 换式/收势：归档上一式的平均分
+    if (baduanjin.moveIndex >= 0 && baduanjin.lastMove) {
+      baduanjin.moveScores.push({
+        id: baduanjin.lastMove.id,
+        name: baduanjin.lastMove.name,
+        score: baduanjin.current?.smooth ?? null,
+      });
+      baduanjin.moveIndex = -1;
+      baduanjin.lastMove = null;
+    }
+    renderBaduanjin(current);
+    return;
+  }
+  if (current.index !== baduanjin.moveIndex) {
+    baduanjin.moveIndex = current.index;
+    baduanjin.lastMove = current.move;
+    baduanjin.current = { sum: 0, frames: 0, smooth: null };
+    speak(`${current.move.name}。${current.move.cue}`);
+  }
+  const result = scoreMove(current.move, points);
+  if (result.score != null) {
+    baduanjin.current.sum += result.score;
+    baduanjin.current.frames += 1;
+    baduanjin.current.smooth = Math.round(baduanjin.current.sum / baduanjin.current.frames);
+    baduanjin.jointStates = result.jointStates;
+  }
+  renderBaduanjin(current);
+}
+
+function renderBaduanjin(current) {
+  if (!current || !baduanjin) return;
+  if (current.phase === 'move') {
+    ui.baduanjinMove.textContent = `${current.index + 1}/${current.total} · ${current.move.name}`;
+    ui.baduanjinCue.textContent = current.move.cue;
+  } else if (current.phase === 'transition') {
+    ui.baduanjinMove.textContent = `${current.index + 1}/${current.total} 已完成`;
+    ui.baduanjinCue.textContent = current.cue ?? '';
+  } else {
+    ui.baduanjinMove.textContent = '收势';
+    ui.baduanjinCue.textContent = current.cue ?? '';
+  }
+  ui.baduanjinRemain.textContent = `剩余 ${Math.ceil(current.remaining ?? 0)} 秒`;
+  ui.baduanjinProgress.style.width = `${Math.round((current.progress ?? 0) * 100)}%`;
+  ui.baduanjinScore.textContent = baduanjin?.current?.smooth != null
+    ? `当前式得分：${baduanjin.current.smooth}`
+    : '当前式得分：—';
+}
+
+function startBaduanjin() {
+  if (!agent || mode !== 'camera') {
+    showToast('八段锦跟练需要开启相机（全身骨骼跟踪）。');
+    return;
+  }
+  if (agent.training.active) {
+    showToast('请先结束康复训练，再进行八段锦跟练。');
+    return;
+  }
+  baduanjin = {
+    session: new BaduanjinSession({ config: DEFAULT_CONFIG, now: performance.now() / 1000 }),
+    moveScores: [],
+    moveIndex: -1,
+    lastMove: null,
+    current: null,
+    jointStates: null,
+  };
+  skeletonTrails = { wristL: [], wristR: [], hip: [] };
+  ui.baduanjinBtn.textContent = '结束跟练';
+  ui.baduanjinNow.style.display = 'grid';
+  agent.setPractice(true, '八段锦');
+  speak('八段锦跟练开始。请跟随口令，动作缓慢量力而行。');
+}
+
+function finishBaduanjin(natural) {
+  if (!baduanjin) return;
+  if (baduanjin.lastMove && baduanjin.current) {
+    baduanjin.moveScores.push({
+      id: baduanjin.lastMove.id,
+      name: baduanjin.lastMove.name,
+      score: baduanjin.current.smooth ?? null,
+    });
+  }
+  const summary = aggregateScores(baduanjin.moveScores);
+  ui.baduanjinNow.style.display = 'none';
+  ui.baduanjinBtn.textContent = '开始跟练';
+  if (summary.total != null) {
+    ui.baduanjinStatus.textContent = `上次：总分 ${summary.total} · ${summary.moves
+      .map((move) => `${move.name.slice(0, 2)} ${move.score ?? '—'}`)
+      .join(' · ')}`;
+  } else {
+    ui.baduanjinStatus.textContent = '上次：未采集到有效动作帧（请确保全身在画面内）。';
+  }
+  speak(natural ? `八段锦跟练完成，总分 ${summary.total ?? '—'} 分。` : '跟练已结束。');
+  if (agent) {
+    agent.setPractice(false);
+    agent.journal.record({ t: agent.lastT, type: 'practice', action: 'finish', kind: 'baduanjin', score: summary.total, moves: summary.moves });
+  }
+  baduanjin = null;
+  skeletonTrails = { wristL: [], wristR: [], hip: [] };
+}
+
+ui.baduanjinBtn.onclick = () => {
+  if (baduanjin) finishBaduanjin(false);
+  else startBaduanjin();
+};
 
 // 定时提醒（页面需保持打开；系统级提醒属后续里程碑——见 README）。
 function loadSchedule() {

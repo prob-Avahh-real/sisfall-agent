@@ -143,6 +143,12 @@ export const DEFAULT_CONFIG = {
     medication: { enabled: false, times: ['08:00', '20:00'] }, // 仅时间提醒；遵医嘱设置
   },
 
+  baduanjin: {
+    // 八段锦跟练（core/baduanjin.js）：每式时长与换式间歇。
+    moveSeconds: 30,
+    transitionSec: 5,
+  },
+
   staging: {
     // Longitudinal classification of evidence into stages 0-3.
     evidenceWindowSec: 900,  // rolling window used for classification

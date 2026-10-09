@@ -7,6 +7,7 @@ import { TRAINING_LIBRARY } from '../core/training.js';
 import { SYMPTOM_KEYS, adviceFor } from '../core/symptoms.js';
 import { carePlan } from '../core/care.js';
 import { MUSIC_MODES } from '../core/music.js';
+import { BADUANJIN_MOVES } from '../core/baduanjin.js';
 
 test('范围契约结构完整：行动最小集 / agent 动作 / 边界 / 来源', () => {
   assert.ok(PD_PATIENT_ACTIONS.length >= 4, '患者行动最小集至少四类行动');
@@ -52,6 +53,13 @@ test('训练动作库全部带 evidence 且文本合规', () => {
 
 test('音乐疗愈模式文案合规（不强声称疗效）', () => {
   scan('音乐疗愈', Object.values(MUSIC_MODES).map((mode) => `${mode.label} ${mode.description}`));
+});
+
+test('八段锦招式文案与依据合规', () => {
+  for (const move of BADUANJIN_MOVES) {
+    assert.ok(move.evidence, `${move.id} 缺少 evidence 字段`);
+    scan(`八段锦 ${move.id}`, [move.name, move.cue, move.evidence]);
+  }
 });
 
 test('起身（体位）管理要素存在：分步起身与诱因在症状与护理建议中均有覆盖', () => {

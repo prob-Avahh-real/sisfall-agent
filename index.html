@@ -102,6 +102,19 @@
         </div>
         <p class="train-cue" id="musicState">未开启——节拍用于步态节律提示，呼吸用于放松。</p>
 
+        <h3>八段锦跟练</h3>
+        <p class="training-status" id="baduanjinStatus">未开始——跟练需要开启相机（全身骨骼跟踪）。</p>
+        <div class="training-now" id="baduanjinNow" style="display:none">
+          <b id="baduanjinMove">—</b>
+          <span class="train-remain" id="baduanjinRemain"></span>
+          <div class="track"><i id="baduanjinProgress"></i></div>
+          <p class="train-cue" id="baduanjinCue"></p>
+          <p class="train-cue" id="baduanjinScore">当前式得分：—</p>
+        </div>
+        <div class="train-controls">
+          <button class="secondary" id="baduanjinBtn">开始跟练</button>
+        </div>
+
         <div class="actions">
           <button class="primary" id="cameraBtn">启动相机分析</button>
           <div class="sim-controls">

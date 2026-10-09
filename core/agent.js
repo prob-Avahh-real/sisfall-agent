@@ -44,6 +44,7 @@ export class SisFallAgent {
     this.stager = new PatientStager(this.config);
     this._envInference = new EnvironmentInference(this.config);
     this.training = { active: false, session: null, source: null, startedAt: null, lastSummary: null };
+    this.practice = { active: false, name: null };
     this._trainingScores = [];
     this.policy = createPolicyState(0);
     this.lastT = 0;
@@ -108,6 +109,15 @@ export class SisFallAgent {
         ? '已记录：环境风险。未来一段时间预警会提前，请放慢脚步。'
         : '已记录：不调整。如有不适请报告症状。',
     };
+  }
+
+  /**
+   * 练习活动（如八段锦跟练）：与训练共用"预期波动"语义——进行中暂缓
+   * 注意级提示（预警/危险不降级）。得分汇总由调用方记入 journal。
+   */
+  setPractice(active, name = null) {
+    this.practice = active ? { active: true, name } : { active: false, name: null };
+    if (active) this.journal.record({ t: this.lastT, type: 'practice', action: 'start', name });
   }
 
   /** 开始一次康复训练会话（动作按当前阶段选择）。 */
@@ -247,7 +257,9 @@ export class SisFallAgent {
 
     const trainingContext = this.training.active
       ? { active: true, exercise: this.training.session.currentAt(t).exercise?.name ?? null }
-      : { active: false };
+      : this.practice.active
+        ? { active: true, exercise: this.practice.name }
+        : { active: false };
     const { state, actions: policyActions, transition, policy } = decidePolicy(
       this.policy,
       { now: t, risk: effective, forecast, baseline, symptoms: symptomContext, training: trainingContext },
