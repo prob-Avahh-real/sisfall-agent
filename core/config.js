@@ -34,6 +34,22 @@ export const DEFAULT_CONFIG = {
     lateralGain: 0.4,    // g -> lateralOffset proxy scale
   },
 
+  device: {
+    // Phone/band source budgets and UI behavior (surfaced live in the web UI).
+    targetHz: 50,          // design sample rate for device sources
+    renderThrottleMs: 66,  // UI refresh cap for high-rate sensor modes (~15 fps)
+    maxIngestP95Ms: 5,     // budget: warn once if per-sample ingest p95 exceeds this
+    ble: {
+      // Defaults match common FFE0/FFE1 UART-style BLE modules (ESP32/Arduino
+      // prototypes). Override with your band's real GATT UUIDs (discover with
+      // nRF Connect or the vendor docs).
+      serviceUuid: '0000ffe0-0000-1000-8000-00805f9b34fb',
+      characteristicUuid: '0000ffe1-0000-1000-8000-00805f9b34fb',
+      packetBytes: 6,      // 3 × int16 LE accelerometer samples
+      accelScale: 4096,    // g = raw / accelScale
+    },
+  },
+
   baseline: {
     warmupFrames: 90,      // ~6 s at 15 Hz before personalization is trusted
     ewmaAlpha: 0.0005,     // slow drift of the personal normal (≈minutes, not seconds)

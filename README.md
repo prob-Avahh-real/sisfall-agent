@@ -17,9 +17,12 @@ node scripts/demo.js wobble-shift          # unusual-for-you detection
 npm start                                  # web UI at http://localhost:4173
 ```
 
-The web UI has two modes: **camera** (MediaPipe pose, needs first-load internet to
-fetch the model) and **scenarios** (offline simulation). Check-in chips in the
-right panel report symptoms during a live session.
+The web UI has four input modes: **camera** (MediaPipe pose, needs first-load
+internet to fetch the model), **scenarios** (offline simulation), **phone motion**
+(DeviceMotion — front pocket or chest-mounted) and **BLE band** (Web Bluetooth to
+an open-GATT IMU band). Check-in chips in the right panel report symptoms during
+a live session. Device modes show effective sample rate and p95 processing
+latency live against the budget in `config.device` (`maxIngestP95Ms: 5`).
 
 ## Architecture
 
@@ -40,6 +43,8 @@ core/                            pure logic, no DOM, no browser APIs, no wall cl
 sources/                         adapters, all emitting canonical observations
   pose.js          MediaPipe landmarks -> features (all measured)
   imu.js           raw accel (g) -> features (lean measured; drop/lateral proxy)
+  devicemotion.js  phone DeviceMotion events -> mapper (iOS permission helpers)
+  web-bluetooth.js BLE GATT notifications -> mapper (packet parser, fake-able)
   sim.js           deterministic seeded scenarios + interleaved check-ins
 scripts/demo.js                  terminal demo
 test/                            unit + end-to-end scenario suite
@@ -112,6 +117,44 @@ change) · `dizzy-walk` (moderate walk + dizziness check-in at t=5) ·
 `near-fall` (18 s, predicted ~0.8 s before the danger band) · `imu-near-fall`
 (16 s, raw accel through the real IMU mapper).
 
+## Device sources (M2)
+
+**Phone motion (`sources/devicemotion.js`)** — wraps `DeviceMotionEvent`
+(`accelerationIncludingGravity`, m/s² → g) through the real IMU mapper. iOS 13+
+requires a user-gesture permission request; the UI handles it on button press.
+Devices that provide only gravity-free `acceleration` are reported as
+unsupported rather than silently mis-scored. The mapper self-calibrates its
+upright reference from the first quiet seconds.
+
+**BLE band (`sources/web-bluetooth.js`)** — subscribes to GATT notifications.
+Default packet: 6 bytes, 3 × int16 little-endian accelerometer, g = raw / 4096
+(matches common FFE0/FFE1 UART modules). Default UUIDs are that module family —
+override `config.device.ble.*` with your band's real UUIDs (find them with
+nRF Connect). Browser support: Chrome/Edge (desktop + Android); Safari/iOS do
+not implement Web Bluetooth. Vendor watches (watchOS/WearOS) need companion
+apps — out of scope for this adapter.
+
+**Budgets.** `config.device`: `targetHz 50` design rate, `renderThrottleMs 66`
+(DOM refresh cap — alarm actions are never throttled), `maxIngestP95Ms 5`
+(one-time UI warning when exceeded). The live badge shows `Hz · p95 ms` while a
+device source runs. The phone browser page must stay in the foreground —
+background operation needs the Capacitor/native path or the M4 wearable. Per
+sample the cost is one listener callback with O(1) processing; no extra timers
+beyond the render throttle; no network.
+
+### Manual device test checklist (not CI-coverable)
+
+1. iPhone/Android: open the UI, press **Use phone motion sensor**, grant motion
+   permission. Badge should settle around 50–60 Hz with p95 well under 5 ms.
+2. Hold the phone upright ~2 s (mapper warms), then tilt forward steadily:
+   "Body alignment" rises; a strong tilt escalates the agent state.
+3. Walk 60 s with the phone in a front pocket: baseline warmup completes (~6 s),
+   no alarms during a normal walk.
+4. Shake the phone briefly mid-walk: instability signals appear, then clear.
+5. Chrome (desktop or Android): with a compatible FFE0/FFE1 module powered on,
+   press **Connect BLE band** → chooser → connect → notifications stream (badge
+   shows `BLE · Hz`). Use the module's real UUIDs in config if they differ.
+
 ## Safety & privacy
 
 Prototype only — not a validated medical device or emergency service. Risk
@@ -129,8 +172,10 @@ This is a dev server (`python3 -m http.server`) — not a deployment story.
 - **M0** ✅ web risk demo (MediaPipe, heuristic score)
 - **M1** ✅ agent core: sources, baseline, forecast, policy, symptoms, staging,
   care plans, 10 test suites, terminal demo, rewired UI
-- **M2** real device time: phone IMU (DeviceMotion/Capacitor) as a live source,
-  latency + battery budget, BLE watch path
+- **M2** 🔄 core delivered: phone IMU (DeviceMotion) + BLE band adapters with
+  latency/battery instrumentation and unit tests; on-device behavior pending the
+  manual checklist above; native/background path (Capacitor) and vendor-watch
+  companion apps remain open
 - **M3** data + validation: SisFall/MobiFall-class training data for the learned
   risk model, false-alarm/alarm-latency targets, clinical review of thresholds
   and staging

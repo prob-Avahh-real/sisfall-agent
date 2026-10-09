@@ -1,7 +1,10 @@
 import { SteadyStepAgent } from './core/agent.js';
 import { RiskSmoother } from './core/risk.js';
+import { DEFAULT_CONFIG } from './core/config.js';
 import { poseObservation } from './sources/pose.js';
 import { runScenario, interleave, SCENARIOS } from './sources/sim.js';
+import { DevicemotionSource, requestMotionPermission } from './sources/devicemotion.js';
+import { BleImuSource } from './sources/web-bluetooth.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -10,6 +13,7 @@ const ui = {
   alert: $('alertBox'), advice: $('alertAdvice'), nudge: $('nudgeBox'), nudgeText: $('nudgeText'),
   toast: $('toast'), camera: $('cameraBtn'), demo: $('demoBtn'), scenario: $('scenario'),
   obstacle: $('obstacle'), sound: $('soundBtn'), stateChip: $('stateChip'),
+  motion: $('motionBtn'), ble: $('bleBtn'),
   careLabel: $('careLabel'), careAdvice: $('careAdvice'), chips: $('checkinChips'),
 };
 
@@ -28,6 +32,34 @@ let lastAlarm = 0;
 let simQueue = null;
 let simIndex = 0;
 let displayedStage = null;
+let activeSource = null;
+let lastRenderAt = 0;
+
+// Latency/battery instrumentation for device modes: per-sample ingest cost
+// (p95 budget in config.device) and the effective observation rate.
+const perf = {
+  ingests: [],
+  sampleT: [],
+  budgetWarned: false,
+  markIngest(ms) {
+    this.ingests.push(ms);
+    if (this.ingests.length > 240) this.ingests.shift();
+  },
+  markSample(t) {
+    this.sampleT.push(t);
+    if (this.sampleT.length > 240) this.sampleT.shift();
+  },
+  stats() {
+    const n = this.ingests.length;
+    if (n === 0) return { hz: 0, avg: 0, p95: 0 };
+    const sorted = [...this.ingests].sort((a, b) => a - b);
+    const avg = this.ingests.reduce((sum, value) => sum + value, 0) / n;
+    const p95 = sorted[Math.min(n - 1, Math.floor(n * 0.95))];
+    const ts = this.sampleT;
+    const hz = ts.length > 8 ? (ts.length - 1) / Math.max(1e-6, ts[ts.length - 1] - ts[0]) : 0;
+    return { hz, avg, p95 };
+  },
+};
 
 const SIM_EVENTS_PER_TICK = 4; // ~4x real time
 const connections = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
@@ -140,8 +172,18 @@ function render(step) {
     ui.alert.style.display = 'none';
     ui.nudge.style.display = 'none';
   }
-  runActions(step.actions);
   renderCare(step.stage);
+}
+
+// Actions are never throttled (they are edge-triggered and sparse — alarms
+// must not drop); only the DOM refresh is capped for high-rate sensor modes.
+function handleStep(step, { throttled = false } = {}) {
+  runActions(step.actions);
+  const now = performance.now();
+  if (!throttled || now - lastRenderAt >= DEFAULT_CONFIG.device.renderThrottleMs) {
+    lastRenderAt = now;
+    render(step);
+  }
 }
 
 async function loadPoseModel() {
@@ -199,14 +241,15 @@ function predictLoop() {
       previousPose = observation.debug;
       previousAt = now;
       const step = agent.ingest({ ...observation, context: { obstacle: ui.obstacle.checked } });
-      render(step);
+      handleStep(step);
     }
   }
   requestAnimationFrame(predictLoop);
 }
 
 async function startCamera() {
-  if (mode === 'sim') stopSim();
+  stopSim();
+  stopSensor();
   try {
     ui.camera.disabled = true;
     ui.camera.textContent = 'Loading pose model…';
@@ -248,6 +291,7 @@ function stopCamera() {
 
 function startSim() {
   if (mode === 'camera') stopCamera();
+  stopSensor();
   const name = ui.scenario.value;
   const { observations, checkins } = runScenario(name);
   simQueue = interleave(observations, checkins);
@@ -272,7 +316,7 @@ function simTick() {
       showToast(`${result.label}: ${result.advice}`);
     } else {
       const step = agent.ingest({ ...event.observation, context: { obstacle } });
-      render(step);
+      handleStep(step);
     }
   }
   if (simIndex >= simQueue.length) stopSim();
@@ -292,8 +336,87 @@ function stopSim() {
   if (agent) renderCare(agent.stage(), true); // final, established classification
 }
 
+function stopSensor() {
+  activeSource?.stop?.();
+  activeSource = null;
+  if (mode === 'motion' || mode === 'ble') {
+    mode = 'idle';
+    running = false;
+    ui.live.style.display = 'none';
+  }
+  ui.motion.textContent = 'Use phone motion sensor';
+  ui.ble.textContent = 'Connect BLE band';
+}
+
+function ingestDeviceObservation(observation) {
+  const t0 = performance.now();
+  const step = agent.ingest({ ...observation, context: { obstacle: ui.obstacle.checked } });
+  perf.markIngest(performance.now() - t0);
+  perf.markSample(observation.t);
+  handleStep(step, { throttled: true });
+  if (mode !== 'motion' && mode !== 'ble') return;
+  const stats = perf.stats();
+  const label = mode === 'motion' ? 'PHONE' : 'BLE';
+  ui.live.innerHTML = `<i></i> ${label} · ${stats.hz.toFixed(0)} Hz · ${stats.p95.toFixed(1)} ms`;
+  if (!perf.budgetWarned && perf.ingests.length >= 120 && stats.p95 > DEFAULT_CONFIG.device.maxIngestP95Ms) {
+    perf.budgetWarned = true;
+    showToast(`Processing p95 ${stats.p95.toFixed(1)} ms exceeds the ${DEFAULT_CONFIG.device.maxIngestP95Ms} ms budget — reduce UI refresh or sample rate.`);
+  }
+}
+
+async function startMotion() {
+  stopSim();
+  stopSensor();
+  if (mode === 'camera') stopCamera();
+  const permission = await requestMotionPermission();
+  if (permission !== 'granted') {
+    showToast('Motion permission denied — allow Motion & Orientation Access and retry.');
+    return;
+  }
+  startSession();
+  const source = new DevicemotionSource({ onObservation: ingestDeviceObservation });
+  source.start(window);
+  activeSource = source;
+  mode = 'motion';
+  running = true;
+  ui.empty.style.display = 'none';
+  ui.live.style.display = 'block';
+  ui.live.innerHTML = '<i></i> PHONE · warming up';
+  ui.motion.textContent = 'Phone sensor active';
+}
+
+async function startBle() {
+  stopSim();
+  stopSensor();
+  if (mode === 'camera') stopCamera();
+  startSession();
+  const source = new BleImuSource({
+    onObservation: ingestDeviceObservation,
+    onStatus: (status) => showToast(status),
+  });
+  try {
+    ui.ble.disabled = true;
+    ui.ble.textContent = 'Connecting…';
+    await source.connect();
+    activeSource = source;
+    mode = 'ble';
+    running = true;
+    ui.empty.style.display = 'none';
+    ui.live.style.display = 'block';
+    ui.live.innerHTML = '<i></i> BLE · connected';
+    ui.ble.textContent = 'BLE band streaming';
+  } catch (e) {
+    showToast(`BLE connection failed: ${e.message}`);
+    ui.ble.textContent = 'Connect BLE band';
+  } finally {
+    ui.ble.disabled = false;
+  }
+}
+
 ui.camera.onclick = () => { if (mode !== 'camera') startCamera(); };
 ui.demo.onclick = () => { if (mode === 'sim') stopSim(); else startSim(); };
+ui.motion.onclick = () => { if (mode !== 'motion') startMotion(); };
+ui.ble.onclick = () => { if (mode !== 'ble') startBle(); };
 ui.sound.onclick = () => { soundOn = !soundOn; ui.sound.textContent = soundOn ? 'Sound on' : 'Sound off'; };
 ui.chips.addEventListener('click', (event) => {
   const button = event.target.closest('[data-symptom]');

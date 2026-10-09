@@ -13,7 +13,9 @@ emits stage-matched care advice. Prototype, not a medical device.
 
 - **Debug surface**: browser app (`npm start`, port 4173). Development harness.
 - **M2 target**: phone (IMU via DeviceMotion or Capacitor) — the realistic
-  wearable form factor for this use case.
+  wearable form factor for this use case. Status: DeviceMotion + Web Bluetooth
+  band adapters delivered and unit-tested; on-device behavior is verified only
+  via the README manual checklist (CI cannot cover radios).
 - **M4 target**: embedded wearable (ESP32+IMU pre-impact detector sharing
   `config.js` thresholds). `na/optional` until M2 lands.
 - No cloud service target: journals and video stay local by design.
@@ -31,6 +33,10 @@ node --test --experimental-test-coverage   # coverage snapshot
 
 1. **core/ is pure**: no DOM, browser APIs, wall clock, or network. Journal
    timestamps use the observation clock (`t`) so replays are deterministic.
+   Browser sources (`devicemotion`, `web-bluetooth`) may touch browser APIs only
+   behind injectable seams (constructor-injected `now`, `bluetooth`, target
+   objects) and must stay unit-testable in plain Node — see the fake-event and
+   fake-GATT tests.
 2. **All numbers live in `core/config.js`** — no magic thresholds in logic
    files. New tuning knobs go to config with a comment.
 3. **Coverage honesty**: sources declare `measured | proxy | unavailable` per
@@ -68,5 +74,8 @@ node --test --experimental-test-coverage   # coverage snapshot
 - `baseline.deviation()` mutates hold counters (documented); call it once per
   frame as the agent does.
 - UI has no automated tests (logic lives in tested core; keep it that way).
+- Device radio paths (motion permission, BLE pairing, real sample rates) are
+  hardware/OS dependent and not CI-coverable; keep the README manual device
+  checklist in sync when touching those sources.
 - Learned risk model (M3) must plug in behind `predictor`/`risk` interfaces
   with the same coverage + explainability contracts.
