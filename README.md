@@ -144,6 +144,11 @@ beyond the render throttle; no network.
 
 ### Manual device test checklist (not CI-coverable)
 
+Sensor APIs require a **secure context**: `http://localhost` works on desktop
+browsers, but to test from a phone you need HTTPS (local cert, or a tunnel) —
+plain `http://<lan-ip>` will not deliver motion events on iOS Safari or Android
+Chrome.
+
 1. iPhone/Android: open the UI, press **Use phone motion sensor**, grant motion
    permission. Badge should settle around 50–60 Hz with p95 well under 5 ms.
 2. Hold the phone upright ~2 s (mapper warms), then tilt forward steadily:
