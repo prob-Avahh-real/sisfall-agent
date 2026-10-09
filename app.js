@@ -5,6 +5,7 @@ import { poseObservation } from './sources/pose.js';
 import { runScenario, interleave, SCENARIOS } from './sources/sim.js';
 import { DevicemotionSource, requestMotionPermission } from './sources/devicemotion.js';
 import { BleImuSource } from './sources/web-bluetooth.js';
+import { matchVoiceCommand, isScheduleDue, dayKey } from './core/training.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -12,8 +13,13 @@ const ui = {
   score: $('score'), gaugeBar: $('gaugeBar'), label: $('riskLabel'), signals: $('signals'),
   alert: $('alertBox'), advice: $('alertAdvice'), nudge: $('nudgeBox'), nudgeText: $('nudgeText'),
   toast: $('toast'), camera: $('cameraBtn'), demo: $('demoBtn'), scenario: $('scenario'),
-  obstacle: $('obstacle'), sound: $('soundBtn'), stateChip: $('stateChip'),
+  sound: $('soundBtn'), stateChip: $('stateChip'),
   motion: $('motionBtn'), ble: $('bleBtn'),
+  askBar: $('askBar'), askText: $('askText'), askYes: $('askYes'), askNo: $('askNo'),
+  trainBtn: $('trainBtn'), voiceBtn: $('voiceBtn'), trainingStatus: $('trainingStatus'),
+  trainingNow: $('trainingNow'), trainExercise: $('trainExercise'), trainRemain: $('trainRemain'),
+  trainProgress: $('trainProgress'), trainCue: $('trainCue'),
+  scheduleOn: $('scheduleOn'), scheduleTime: $('scheduleTime'), scheduleState: $('scheduleState'),
   careLabel: $('careLabel'), careAdvice: $('careAdvice'), chips: $('checkinChips'),
 };
 
@@ -65,6 +71,14 @@ const SIM_EVENTS_PER_TICK = 4; // ~4x real time
 const connections = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
 const FEATURE_NAMES = { torsoLean: '前倾', lateralOffset: '重心偏移', hipDropSpeed: '下坠', kneeAsymmetry: '负重不均' };
 const CARE_KINDS = { activity: '活动', environment: '环境', clinical: '就医', monitoring: '监测', care: '照护' };
+
+// 环境行的展示：外部标记（测试/演示注入）优先，其次传感器推断的确认状态。
+function environmentText(env = {}) {
+  if (env.inferred?.active) return '已确认：湿滑/障碍 · 预警提前';
+  if (env.obstacle || env.lowLight) return '外部标记 · 预警提前';
+  if (env.pendingQuestion) return '待确认';
+  return '正常';
+}
 const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function startSession() {
@@ -110,6 +124,8 @@ function runActions(actions) {
       ui.nudgeText.textContent = action.text;
     } else if (action.kind === 'visual') {
       showToast(action.text);
+    } else if (action.kind === 'question') {
+      showAsk(action);
     }
   }
 }
@@ -173,6 +189,7 @@ function render(step) {
     ['预测', forecastText],
     ['个人基线', fitText],
     ['症状', symptomText],
+    ['环境', environmentText(step.environment)],
   ];
   ui.signals.innerHTML = rows.map(([a, b]) => `<li><span>${a}</span><b>${escapeHtml(String(b))}</b></li>`).join('');
 
@@ -248,7 +265,7 @@ function predictLoop() {
       const observation = poseObservation(points, previousPose, dt, t);
       previousPose = observation.debug;
       previousAt = now;
-      const step = agent.ingest({ ...observation, context: { obstacle: ui.obstacle.checked } });
+      const step = agent.ingest(observation);
       handleStep(step);
     }
   }
@@ -314,7 +331,6 @@ function startSim() {
 
 function simTick() {
   if (!simQueue) return;
-  const obstacle = ui.obstacle.checked;
   for (let i = 0; i < SIM_EVENTS_PER_TICK && simIndex < simQueue.length; i += 1) {
     const event = simQueue[simIndex];
     simIndex += 1;
@@ -322,7 +338,7 @@ function simTick() {
       const result = agent.ingestCheckin(event.checkin);
       showToast(`${result.label}: ${result.advice}`);
     } else {
-      const step = agent.ingest({ ...event.observation, context: { obstacle } });
+      const step = agent.ingest(event.observation);
       handleStep(step);
     }
   }
@@ -357,7 +373,7 @@ function stopSensor() {
 
 function ingestDeviceObservation(observation) {
   const t0 = performance.now();
-  const step = agent.ingest({ ...observation, context: { obstacle: ui.obstacle.checked } });
+  const step = agent.ingest(observation);
   perf.markIngest(performance.now() - t0);
   perf.markSample(observation.t);
   handleStep(step, { throttled: true });
@@ -419,6 +435,216 @@ async function startBle() {
     ui.ble.disabled = false;
   }
 }
+
+// --- 环境询问：传感器推断触发的主动询问；用户回答才是环境的真实来源 ------
+function showAsk(action) {
+  ui.askText.textContent = action.detail ? `${action.text}（${action.detail}）` : action.text;
+  ui.askBar.classList.add('open');
+  if (speechOn) speak(action.text);
+}
+
+function answerEnvironment(yes) {
+  ui.askBar.classList.remove('open');
+  if (!agent) return;
+  const result = agent.ingestEnvironmentAnswer({ t: agent.lastT, yes });
+  showToast(result.advice);
+}
+
+ui.askYes.onclick = () => answerEnvironment(true);
+ui.askNo.onclick = () => answerEnvironment(false);
+
+// --- 康复训练：手动 / 语音唤出 / 定时 -------------------------------------
+// 训练按“真实秒”推进（与仿真 4x 时间域解耦）：起点记在 source 时钟上，
+// 之后用墙钟推进。仿真加速下 note 里的动作名可能滞后一帧，无碍安全。
+let trainTicker = null;
+let trainClock = null;
+let speechOn = true;
+let schedule = null;
+let lastScheduleFired = null;
+
+const SCHEDULE_KEY = 'sisfall.trainingSchedule';
+const FIRED_KEY = 'sisfall.trainingFiredDay';
+
+function speak(text) {
+  if (!speechOn || typeof speechSynthesis === 'undefined') return;
+  try {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+  } catch {
+    /* 语音输出失败不影响安全路径 */
+  }
+}
+
+function renderTraining(current) {
+  if (!current) return;
+  const active = !['idle', 'done'].includes(current.phase);
+  ui.trainingNow.style.display = active ? 'grid' : 'none';
+  if (current.phase === 'exercise') {
+    ui.trainExercise.textContent = `${current.index + 1}/${current.total} · ${current.exercise.name}`;
+    ui.trainCue.textContent = `${current.exercise.cue} 注意：${current.exercise.safety}`;
+  } else {
+    const titles = { intro: '准备', rest: '休息', outro: '完成' };
+    ui.trainExercise.textContent = titles[current.phase] ?? '';
+    ui.trainCue.textContent = current.cue ?? '';
+  }
+  ui.trainRemain.textContent = active ? `剩余 ${Math.ceil(current.remaining)} 秒` : '';
+  ui.trainProgress.style.width = `${Math.round((current.progress ?? 0) * 100)}%`;
+}
+
+function startTraining(source = 'manual') {
+  if (!agent || !running) {
+    showToast('请先启动监测（相机/演示/传感器任一），训练时需要智能体观察姿态。');
+    return;
+  }
+  const result = agent.startTraining(agent.lastT, { source });
+  if (!result.ok) {
+    showToast(result.reason);
+    return;
+  }
+  const sourceStart = agent.lastT;
+  const wallStart = performance.now() / 1000;
+  trainClock = () => sourceStart + (performance.now() / 1000 - wallStart);
+  ui.trainBtn.textContent = '结束训练';
+  renderTraining(result.current);
+  speak(`开始康复训练，共 ${result.plan.length} 个动作。${result.plan[0].cue}`);
+  let lastExercise = -1;
+  clearInterval(trainTicker);
+  trainTicker = setInterval(() => {
+    const current = agent ? agent.trainingProgress(trainClock()) : null;
+    if (!current || current.phase === 'done') {
+      endTraining({ completed: true });
+      return;
+    }
+    renderTraining(current);
+    if (current.phase === 'exercise' && current.index !== lastExercise) {
+      lastExercise = current.index;
+      speak(`${current.exercise.name}。${current.exercise.cue} 注意：${current.exercise.safety}`);
+    }
+  }, 1000);
+}
+
+function endTraining({ completed }) {
+  clearInterval(trainTicker);
+  trainTicker = null;
+  if (!agent?.training.active) return;
+  const t = trainClock ? trainClock() : agent.lastT;
+  trainClock = null;
+  const summary = agent.finishTraining(t, { completed });
+  ui.trainBtn.textContent = '开始训练';
+  ui.trainingNow.style.display = 'none';
+  if (summary) {
+    const minutes = Math.floor(summary.durationSec / 60);
+    ui.trainingStatus.textContent = `上次：完成 ${summary.doneExercises}/${summary.totalExercises} · ${minutes} 分 ${summary.durationSec % 60} 秒 · 训练中峰值 ${summary.maxScore}`;
+    speak(completed ? '训练完成，很好！' : '训练已结束。');
+    if (summary.maxScore >= 72) {
+      showToast('训练中出现过高风险姿态，请放慢动作并保持扶稳。');
+    }
+  }
+}
+
+ui.trainBtn.onclick = () => {
+  if (agent?.training.active) endTraining({ completed: false });
+  else startTraining('manual');
+};
+
+// 语音唤出（Web Speech API 识别 + 关键词匹配；不支持时自动降级为按钮）。
+const SpeechRecognitionImpl = window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+let recognition = null;
+let voiceOn = false;
+
+function setVoice(on) {
+  if (on && !SpeechRecognitionImpl) {
+    showToast('此浏览器不支持语音识别（可用桌面版 Chrome/Edge）。');
+    return;
+  }
+  voiceOn = on;
+  ui.voiceBtn.textContent = voiceOn ? '语音唤出：监听中' : '语音唤出：关';
+  if (!voiceOn) {
+    recognition?.stop?.();
+    recognition = null;
+    return;
+  }
+  recognition = new SpeechRecognitionImpl();
+  recognition.lang = 'zh-CN';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const command = matchVoiceCommand(event.results[i][0].transcript);
+      if (command === 'start' && !agent?.training.active) startTraining('voice');
+      if (command === 'stop' && agent?.training.active) endTraining({ completed: false });
+    }
+  };
+  recognition.onend = () => {
+    if (voiceOn && recognition) {
+      try {
+        recognition.start();
+      } catch {
+        /* 重启失败则等待下一次点击 */
+      }
+    }
+  };
+  recognition.onerror = () => {};
+  try {
+    recognition.start();
+  } catch {
+    showToast('语音识别启动失败，可改用按钮或定时提醒。');
+    setVoice(false);
+  }
+}
+
+ui.voiceBtn.onclick = () => setVoice(!voiceOn);
+
+// 定时提醒（页面需保持打开；系统级提醒属后续里程碑——见 README）。
+function loadSchedule() {
+  try {
+    schedule = JSON.parse(localStorage.getItem(SCHEDULE_KEY) ?? 'null') ?? { ...DEFAULT_CONFIG.training.schedule };
+    lastScheduleFired = localStorage.getItem(FIRED_KEY);
+  } catch {
+    schedule = { ...DEFAULT_CONFIG.training.schedule };
+  }
+  ui.scheduleOn.checked = Boolean(schedule.enabled);
+  ui.scheduleTime.value = schedule.time ?? '09:00';
+  renderScheduleState();
+}
+
+function saveSchedule() {
+  schedule = { enabled: ui.scheduleOn.checked, time: ui.scheduleTime.value || '09:00' };
+  try {
+    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
+  } catch {
+    /* 隐私模式下可能不可用，内存态照常工作 */
+  }
+  renderScheduleState();
+}
+
+function renderScheduleState() {
+  ui.scheduleState.textContent = schedule?.enabled
+    ? `每天 ${schedule.time}${agent ? '' : '（需先启动监测）'}`
+    : '未启用';
+}
+
+function scheduleWatch() {
+  if (!schedule?.enabled) return;
+  if (agent?.training.active) return;
+  if (!isScheduleDue(schedule, new Date(), lastScheduleFired)) return;
+  lastScheduleFired = dayKey(new Date());
+  try {
+    localStorage.setItem(FIRED_KEY, lastScheduleFired);
+  } catch {
+    /* 同上 */
+  }
+  showToast(`该做康复训练了（每天 ${schedule.time}）。点击“开始训练”。`);
+  speak('该做康复训练了。请点击开始训练。');
+}
+
+ui.scheduleOn.onchange = saveSchedule;
+ui.scheduleTime.onchange = saveSchedule;
+setInterval(scheduleWatch, 30000);
+
+loadSchedule();
 
 ui.camera.onclick = () => { if (mode !== 'camera') startCamera(); };
 ui.demo.onclick = () => { if (mode === 'sim') stopSim(); else startSim(); };

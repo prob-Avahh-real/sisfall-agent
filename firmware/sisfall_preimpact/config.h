@@ -19,14 +19,14 @@
 #define SF_WEIGHT_ASYM 0.1100f
 
 // Feature pressure scales (config.risk.scales)
-#define SF_SCALE_TORSO_START 8.0000f
+#define SF_SCALE_TORSO_START 12.0000f
 #define SF_SCALE_TORSO_FULL 50.0000f
-#define SF_SCALE_OFFSET_START 0.3500f
-#define SF_SCALE_OFFSET_FULL 2.0000f
-#define SF_SCALE_DROP_START 0.0000f
+#define SF_SCALE_OFFSET_START 0.5000f
+#define SF_SCALE_OFFSET_FULL 2.2000f
+#define SF_SCALE_DROP_START 0.1500f
 #define SF_SCALE_DROP_FULL 0.9000f
-#define SF_SCALE_ASYM_START 0.0000f
-#define SF_SCALE_ASYM_FULL 0.1800f
+#define SF_SCALE_ASYM_START 0.0500f
+#define SF_SCALE_ASYM_FULL 0.2000f
 
 // Coverage discounts (config.risk.coverageWeight) — firmware coverage set:
 // lean measured, drop/lateral proxy, knee asymmetry unavailable.

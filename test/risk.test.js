@@ -15,9 +15,10 @@ test('rapid leaning drop is dangerous', () => {
   assert.ok(result.score > 90);
 });
 
-test('environmental context raises risk', () => {
+test('environmental context never inflates the posture score (sensitivity lives in the agent)', () => {
   const base = { torsoLean: 27, lateralOffset: 0.8, hipDropSpeed: 0.1, kneeAsymmetry: 0.02 };
-  assert.ok(assessRisk(base, { obstacle: true }).score > assessRisk(base).score);
+  assert.equal(assessRisk(base, { obstacle: true }).score, assessRisk(base).score);
+  assert.equal(assessRisk(base, { lowLight: true }).score, assessRisk(base).score);
 });
 
 test('smoother prioritizes recent readings', () => {
@@ -28,7 +29,8 @@ test('smoother prioritizes recent readings', () => {
 });
 
 test('coverage: unavailable features drop out and weights renormalize', () => {
-  const features = { torsoLean: 12, lateralOffset: 0.4, hipDropSpeed: 0.05, kneeAsymmetry: 0.02 };
+  // 样例值刻意高于各特征死区（校准 2026-10），确保重归一化后有正分。
+  const features = { torsoLean: 30, lateralOffset: 1.2, hipDropSpeed: 0.4, kneeAsymmetry: 0.1 };
   const imuCoverage = {
     torsoLean: 'measured',
     lateralOffset: 'proxy',

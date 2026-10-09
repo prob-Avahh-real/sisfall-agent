@@ -55,3 +55,15 @@ select{font:inherit;padding:8px;border:1px solid var(--line);background:#fff;min
 .check{display:block;font-size:12px;color:var(--muted);margin-top:10px}
 .disclaimer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:16px;padding-top:10px;text-align:center}
 @media(max-width:760px){.monitor{grid-template-columns:1fr}.stage{min-height:300px}}
+.askbar{display:none;position:absolute;z-index:4;bottom:52px;left:8px;right:8px;background:#3a5a99;color:#fff;padding:8px 12px;font-size:13px;align-items:center;gap:10px;justify-content:space-between}
+.askbar.open{display:flex}
+.askbar button{font:inherit;font-size:12px;padding:2px 10px;border:1px solid #ffffff88;background:transparent;color:#fff;cursor:pointer;margin-left:6px}
+.training-status{font-size:13px;margin:0 0 6px}
+.training-now{display:grid;gap:4px;margin-bottom:8px}
+.training-now b{font-weight:600}
+.train-remain{color:var(--muted);font-size:12px}
+.train-cue{color:var(--muted);font-size:12px;margin:0}
+.train-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.schedule-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.schedule-row input[type=time]{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;padding:2px 6px}
+.schedule-state{margin-left:auto}

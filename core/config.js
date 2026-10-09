@@ -12,13 +12,37 @@ export const DEFAULT_CONFIG = {
     // originally measured pose feature set; other sets renormalize.
     weights: { torsoLean: 0.31, lateralOffset: 0.29, hipDropSpeed: 0.29, kneeAsymmetry: 0.11 },
     // Maps a raw feature value to a 0..1 "pressure": 0 at `start`, 1 at `full`.
+    // `start` is a per-feature dead zone calibrated (2026-10 pass) so that
+    // normal walking/standing — including camera-landmark jitter — reads as
+    // exactly zero; the score only moves when posture genuinely deteriorates.
     scales: {
-      torsoLean: { start: 8, full: 50 },
-      lateralOffset: { start: 0.35, full: 2.0 },
-      hipDropSpeed: { start: 0, full: 0.9 },
-      kneeAsymmetry: { start: 0, full: 0.18 },
+      torsoLean: { start: 12, full: 50 },
+      lateralOffset: { start: 0.5, full: 2.2 },
+      hipDropSpeed: { start: 0.15, full: 0.9 },
+      kneeAsymmetry: { start: 0.05, full: 0.2 },
     },
-    environment: { lowLight: 0.1, obstacle: 0.18 },
+    environment: {
+      // Environmental context does NOT add to the posture score: a constant
+      // add-on inflated the calm baseline to ~19 and broke the "normal reads
+      // ~0" contract. It shortens warning horizons instead — the same
+      // sensitivity channel as symptoms, combined with min() in the agent.
+      horizonScale: { lowLight: 0.85, obstacle: 0.8 },
+      // Sensor-assisted inference: a slip/stub micro-event (drop spike with
+      // quick recovery) is a candidate, not a verdict — the agent asks the
+      // user (bounded: cooldowns, max asks) and the answer activates the
+      // sensitivity channel above. See core/environment.js.
+      inference: {
+        slipDropThreshold: 0.45,   // drop-proxy peak that suggests a slip/stub
+        slipRecoveryDrop: 0.2,     // fall-back below this = recovered micro-event
+        slipRecoverWithinSec: 1.2, // recovery must happen this fast after the peak
+        eventDebounceSec: 20,      // same-kind events merge within this window
+        askCooldownSec: 120,       // minimum gap between questions
+        maxAsksPerSession: 3,
+        askTimeoutSec: 60,         // unanswered questions expire
+        dismissHoldSec: 600,       // "no" answer silences asking this long
+        confirmedHoldSec: 1800,    // "yes" answer keeps sensitivity this long
+      },
+    },
     thresholds: { caution: 42, danger: 72 },
     coverageWeight: { measured: 1, proxy: 0.6, unavailable: 0 },
     driversFloor: 0.22,
@@ -85,7 +109,7 @@ export const DEFAULT_CONFIG = {
   policy: {
     cautionExit: 36,
     dangerExit: 64,
-    deviationScoreFloor: 15,  // min absolute score for a personalized nudge
+    deviationScoreFloor: 8,   // min absolute score for a personalized nudge (lowered with the 2026-10 dead-zone calibration)
     recoverHoldSec: 2.5,
     audioCooldownSec: 6,      // minimum gap between audible alarms
     cueCooldownSec: 4,        // minimum gap between spoken/text instructions
@@ -100,10 +124,22 @@ export const DEFAULT_CONFIG = {
     minLevel: 0.05,          // below this a symptom counts as cleared
     boostCap: 35,            // max points added to the effective score
     labelBoostFloor: 5,      // boost that relabels a caution as symptom-driven
+    cautionThreshold: 30,    // caution entry score while a symptom is active (vs 42 normally)
     halfLifeSec: { dizziness: 600, fatigue: 3600, sleepDebt: 21600, anxiety: 1800, pain: 3600, medicationOff: 7200 },
     riskBoost: { dizziness: 25, fatigue: 12, sleepDebt: 8, anxiety: 8, pain: 10, medicationOff: 15 },
     // Forecast horizons multiply by this while the symptom is active (> 1 = warn earlier).
     horizonScale: { dizziness: 1.5, fatigue: 1.25, sleepDebt: 1.1, anxiety: 1.1, pain: 1.1, medicationOff: 1.3 },
+  },
+
+  training: {
+    // 康复训练（定时提醒 + 语音唤出）。状态机与动作库在 core/training.js；
+    // 定时器与 Web Speech API 在 UI 层。训练中暂缓"注意"级视觉提示
+    // （原样记入 journal 为 note），预警/危险级告警绝不降级。
+    exercisesPerSession: 4,
+    introSec: 3,
+    restSec: 8,
+    dampenCaution: true,
+    schedule: { enabled: false, time: '09:00' }, // 默认计划，UI 可改并持久化
   },
 
   staging: {

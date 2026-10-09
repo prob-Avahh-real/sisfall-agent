@@ -15,7 +15,7 @@ function pressure(value, scale) {
 }
 
 export function assessRisk(features = {}, context = {}, config = DEFAULT_CONFIG) {
-  const { weights, scales, environment = {}, thresholds, coverageWeight = {}, driversFloor = 0.22 } = config.risk;
+  const { weights, scales, thresholds, coverageWeight = {}, driversFloor = 0.22 } = config.risk;
   const coverage = normalizeCoverage(context.coverage ?? features.coverage, 'measured');
 
   let numerator = 0;
@@ -30,17 +30,16 @@ export function assessRisk(features = {}, context = {}, config = DEFAULT_CONFIG)
     denominator += weights[key] * factor;
   }
 
-  const env = clamp01(
-    (context.lowLight ? environment.lowLight ?? 0 : 0) + (context.obstacle ? environment.obstacle ?? 0 : 0)
-  );
-  const score = Math.round(clamp01(denominator > 0 ? numerator / denominator + env : env) * 100);
+  // Environmental context (obstacle, low light) is handled one level up in the
+  // agent: it shortens warning horizons (config.risk.environment.horizonScale)
+  // instead of adding a constant to the posture score.
+  const score = Math.round(clamp01(denominator > 0 ? numerator / denominator : 0) * 100);
   const level = score >= thresholds.danger ? 'danger' : score >= thresholds.caution ? 'caution' : 'stable';
 
   const drivers = FEATURE_KEYS.map((key) => [
     coverage[key] === 'unavailable' ? 0 : pressures[key],
     FEATURE_LABELS[key],
   ])
-    .concat([[env, '环境风险已记录']])
     .filter(([value]) => value > driversFloor)
     .sort((a, b) => b[0] - a[0])
     .map(([, label]) => label)

@@ -22,6 +22,7 @@
         <div class="live-badge" id="liveBadge"><i></i> 实时</div>
         <div class="alert" id="alertBox"><span id="alertAdvice"></span></div>
         <div class="nudge" id="nudgeBox"><span id="nudgeText"></span></div>
+        <div class="askbar" id="askBar"><span id="askText"></span><span class="ask-actions"><button id="askYes">是</button><button id="askNo">不是</button></span></div>
         <div class="toast" id="toast" role="status" aria-live="polite"></div>
       </div>
 
@@ -61,6 +62,24 @@
         <p class="care-label" id="careLabel">正在收集证据…</p>
         <ul id="careAdvice"></ul>
 
+        <h3>康复训练</h3>
+        <p class="training-status" id="trainingStatus">未开始</p>
+        <div class="training-now" id="trainingNow" style="display:none">
+          <b id="trainExercise">—</b>
+          <span class="train-remain" id="trainRemain"></span>
+          <div class="track"><i id="trainProgress"></i></div>
+          <p class="train-cue" id="trainCue"></p>
+        </div>
+        <div class="train-controls">
+          <button class="secondary" id="trainBtn">开始训练</button>
+          <button class="secondary" id="voiceBtn">语音唤出：关</button>
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" id="scheduleOn" /> 定时提醒</label>
+          <input type="time" id="scheduleTime" value="09:00" />
+          <span class="schedule-state" id="scheduleState"></span>
+        </div>
+
         <div class="actions">
           <button class="primary" id="cameraBtn">启动相机分析</button>
           <div class="sim-controls">
@@ -77,7 +96,6 @@
           <button class="secondary" id="motionBtn">使用手机传感器</button>
           <button class="secondary" id="bleBtn">连接蓝牙手环</button>
         </div>
-        <label class="check"><input type="checkbox" id="obstacle" /> 附近有障碍物或地面湿滑</label>
       </aside>
     </section>
 

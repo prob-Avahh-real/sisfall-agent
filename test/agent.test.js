@@ -110,6 +110,42 @@ test('dizziness check-in fuses into risk; identical walk stays silent without it
   assert.equal(staged.floorApplied, 'dizziness');
 });
 
+test('恢复后的滑绊微事件触发环境询问；回答只走灵敏度、不灌分数', () => {
+  const { agent, steps } = runScenarioWithAgent('near-fall');
+  const question = steps.flatMap((s) => s.actions).find((a) => a.kind === 'question');
+  assert.ok(question, '主动询问应在滑绊恢复后出现');
+  assert.ok(question.text.includes('湿滑'));
+
+  const before = agent.lastT;
+  const result = agent.ingestEnvironmentAnswer({ t: before, yes: true });
+  assert.equal(result.active, true);
+  const next = agent.ingest({
+    t: before + 0.1,
+    features: { torsoLean: 3, lateralOffset: 0.1, hipDropSpeed: 0.05, kneeAsymmetry: 0 },
+  });
+  assert.equal(next.environment.inferred.active, true);
+  assert.ok(next.environment.horizonScale <= 0.8 + 1e-9, `horizonScale ${next.environment.horizonScale}`);
+  assert.ok(next.effective.score < 10, '姿态平稳时分数不被环境因素灌水');
+  assert.ok(agent.journal.byType('environment').length >= 1);
+});
+
+test('康复训练：开始/结束入 journal，摘要含训练期分数', () => {
+  const agent = new SisFallAgent();
+  const { observations } = runScenario('stable', { seed: 1 });
+  for (const observation of observations.slice(0, 160)) agent.ingest(observation);
+  const started = agent.startTraining(agent.lastT, { source: 'test' });
+  assert.equal(started.ok, true);
+  assert.ok(started.plan.length >= 1);
+  agent.ingest(observations[160]);
+  const summary = agent.finishTraining(agent.lastT, { completed: false });
+  assert.equal(summary.completed, false);
+  assert.equal(summary.source, 'test');
+  assert.ok(Number.isFinite(summary.meanScore));
+  const trainingRecords = agent.journal.byType('training');
+  assert.ok(trainingRecords.some((record) => record.action === 'start'));
+  assert.ok(trainingRecords.some((record) => record.action === 'stopped'));
+});
+
 test('IMU near-fall reaches at least caution via the real mapper, coverage honest', () => {
   const { agent, steps } = runScenarioWithAgent('imu-near-fall');
   assert.ok(steps.some((s) => ['caution', 'danger', 'imminent'].includes(s.state)), 'escalated');

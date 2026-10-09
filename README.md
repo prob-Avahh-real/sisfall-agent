@@ -220,6 +220,58 @@ Verification boundaries, stated plainly:
 - Caregiver notification is a follow-up: events are logged over Serial; nothing
   is transmitted off-device yet.
 
+## Environment inference & active inquiry (2026-10)
+
+The web UI has no "obstacle / slippery floor" checkbox anymore. Instead:
+
+- **Sensor-assisted inference**: a *slip/stub micro-event* — the drop proxy
+  spiking then recovering quickly, without a sustained lowering — registers as
+  a candidate (`core/environment.js`). A candidate, not a verdict: object-level
+  recognition is explicitly out of scope.
+- **Active inquiry, bounded**: in a settled state the agent asks once ("刚才是否
+  遇到地面湿滑或有障碍物？"), at most `maxAsksPerSession` times, with cooldowns
+  and a dismiss-silence window; unanswered questions expire.
+- **The answer is the ground truth**: "yes" confirms the environment for
+  `confirmedHoldSec` (30 min) and shortens warning horizons through the same
+  sensitivity channel as symptoms (×0.8; the posture score itself is *never*
+  inflated). "No" silences asking for 10 minutes.
+- Explicit `context.obstacle` injection still exists for tests / replay / demos,
+  but no longer adds to the score (see the calibration note below).
+
+## Rehabilitation training
+
+- Curated balance/strength routines per risk stage (`core/training.js`):
+  stages 0-1 get standing exercises, stages 2-3 seated/supported ones.
+- **Scheduled reminders**: pick a daily time in the panel (persisted in
+  localStorage). While the page is open a reminder fires once per day within a
+  10-minute window. System-level reminders (page closed) need the Capacitor
+  milestone — prototype boundary, stated rather than faked.
+- **Voice**: Web Speech API. `SpeechSynthesis` reads cues (zh-CN); recognition
+  (Chrome/Edge) matches "开始训练 / 停止训练"-style commands via keyword rules —
+  no cloud NLU inside the app, graceful fallback to buttons when unavailable.
+  Browser speech recognition may use a cloud service; the toggle is off by
+  default and everything works without it.
+- **Safety boundary**: during training the agent defers *caution-level* cues
+  (journaled as `note` — training wobble is expected), but imminent/danger
+  alarms are never dampened. The session summary (completed exercises,
+  duration, peak score) lands in the journal.
+
+## 2026-10 calibration (normal reads zero)
+
+User feedback: the calm score hovered around ~10. Root causes fixed:
+
+- `environment.obstacle/lowLight` were constant score add-ons (+18/+10) —
+  moved to the sensitivity channel (see above).
+- Feature dead zones were too loose (`torsoLean` start 8°; `hipDropSpeed` /
+  `kneeAsymmetry` starting at 0) — raised to 12° / 0.5 / 0.15 / 0.05 so normal
+  walking and camera-landmark jitter read as exactly zero.
+- Linked floors re-tuned: `policy.deviationScoreFloor` 15 → 8; symptom-active
+  caution entry `symptoms.cautionThreshold` 30.
+
+Measured after the fix (seed 1, UI-smoothed): stable walk mean 0.0; wobble mean
+0.5 (max 3); with σ3.5° injected jitter still mean 0.1; near-fall unchanged
+(6/6 alarmed, mean lead 0.70 s).
+
 ## Safety & privacy
 
 Prototype only — not a validated medical device or emergency service. Risk

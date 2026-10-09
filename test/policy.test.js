@@ -90,8 +90,27 @@ test('unusual-for-you deviation nudges at a modest absolute score', () => {
   assert.equal(out.state, 'caution');
   assert.ok(out.actions.some((a) => a.reason === '与您平时不同'));
 
-  const low = decide(createPolicyState(0), { risk: riskAt(10, 'stable'), baseline: devBaseline });
+  const low = decide(createPolicyState(0), { risk: riskAt(5, 'stable'), baseline: devBaseline });
   assert.equal(low.state, 'stable');
+});
+
+test('training mode defers caution cues but never imminent or danger', () => {
+  const out = decide(createPolicyState(0), {
+    risk: riskAt(45, 'caution'),
+    training: { active: true, exercise: '单腿站立' },
+  });
+  assert.equal(out.state, 'caution');
+  assert.ok(out.actions.some((a) => a.kind === 'note'));
+  assert.ok(out.actions.every((a) => a.kind !== 'instruction'));
+
+  const acute = decide(createPolicyState(0), {
+    risk: riskAt(60, 'caution'),
+    forecast: imminentForecast,
+    training: { active: true, exercise: '单腿站立' },
+  });
+  assert.equal(acute.state, 'imminent');
+  assert.ok(acute.actions.some((a) => a.kind === 'instruction'));
+  assert.ok(acute.actions.some((a) => a.kind === 'audio'));
 });
 
 test('caution exits once the score recedes below the exit line', () => {

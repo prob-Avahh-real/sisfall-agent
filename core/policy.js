@@ -50,7 +50,7 @@ function instructionFor(drivers = [], forecast = {}, cause = '', symptoms = null
  */
 export function decidePolicy(policy, input, config = DEFAULT_CONFIG) {
   const cfg = config.policy;
-  const { now, risk, forecast, baseline, symptoms = null } = input;
+  const { now, risk, forecast, baseline, symptoms = null, training = null } = input;
   const prev = policy.state;
 
   let next = prev;
@@ -132,22 +132,33 @@ export function decidePolicy(policy, input, config = DEFAULT_CONFIG) {
       emit({ kind: 'audio', urgency: 'high', text: '警告音', reason: '当前姿态危险' });
       nextPolicy.lastReminderAt.danger = now;
     } else if (next === 'caution') {
-      emit({
-        kind: 'instruction',
-        urgency: 'medium',
-        text:
-          cautionCause === 'deviation'
-            ? instructionFor(risk.drivers, forecast, 'deviation')
-            : cautionCause === 'symptom'
-              ? instructionFor(risk.drivers, forecast, 'symptom', symptoms)
-              : '请放慢速度，稳住身体。',
-        reason:
-          cautionCause === 'deviation'
-            ? '与您平时不同'
-            : cautionCause === 'symptom'
-              ? `症状背景：${symptoms?.topLabel ?? '已报告症状'}`
-              : risk.drivers[0] ?? '注意区间',
-      });
+      if (training?.active && config.training?.dampenCaution) {
+        // 训练中波动属预期：暂缓"注意"级提示，但记录 note 供审计。
+        // 预警/危险级（imminent/danger）绝不降级——安全边界不动。
+        emit({
+          kind: 'note',
+          urgency: 'low',
+          text: `训练中：已暂缓注意提示（${training.exercise ?? '训练动作'}）`,
+          reason: '训练中波动属预期',
+        });
+      } else {
+        emit({
+          kind: 'instruction',
+          urgency: 'medium',
+          text:
+            cautionCause === 'deviation'
+              ? instructionFor(risk.drivers, forecast, 'deviation')
+              : cautionCause === 'symptom'
+                ? instructionFor(risk.drivers, forecast, 'symptom', symptoms)
+                : '请放慢速度，稳住身体。',
+          reason:
+            cautionCause === 'deviation'
+              ? '与您平时不同'
+              : cautionCause === 'symptom'
+                ? `症状背景：${symptoms?.topLabel ?? '已报告症状'}`
+                : risk.drivers[0] ?? '注意区间',
+        });
+      }
     } else if (next === 'recovering') {
       emit({ kind: 'visual', urgency: 'low', text: '已恢复，很好。', reason: '风险消退' });
     }

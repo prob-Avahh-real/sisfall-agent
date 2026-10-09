@@ -12,10 +12,10 @@ would need to judge, plus current scenario metrics.
 
 ## Risk features & bands (`config.risk`)
 
-- **躯干前倾超出支撑面** — weight 0.31, pressure 0 at 8, saturates at 50
-- **重心偏移出站立面** — weight 0.29, pressure 0 at 0.35, saturates at 2
-- **髋部快速下坠** — weight 0.29, pressure 0 at 0, saturates at 0.9
-- **下肢负重不均** — weight 0.11, pressure 0 at 0, saturates at 0.18
+- **躯干前倾超出支撑面** — weight 0.31, pressure 0 at 12, saturates at 50
+- **重心偏移出站立面** — weight 0.29, pressure 0 at 0.5, saturates at 2.2
+- **髋部快速下坠** — weight 0.29, pressure 0 at 0.15, saturates at 0.9
+- **下肢负重不均** — weight 0.11, pressure 0 at 0.05, saturates at 0.2
 - Bands: caution ≥ 42, danger ≥ 72 (0-100 scale)
 - Coverage discounts: measured 1, proxy 0.6, unavailable 0
 
@@ -53,7 +53,7 @@ would need to judge, plus current scenario metrics.
 
 - **stable**: 6 runs · audio alarms 0 · acute-state runs 0 · danger runs 0 · alarmed 0 · missed 0 · mean lead n/a
 - **wobble**: 6 runs · audio alarms 0 · acute-state runs 0 · danger runs 0 · alarmed 0 · missed 0 · mean lead n/a
-- **near-fall**: 6 runs · audio alarms 6 · acute-state runs 6 · danger runs 6 · alarmed 6 · missed 0 · mean lead 0.76 s (min 0.73 s)
+- **near-fall**: 6 runs · audio alarms 6 · acute-state runs 6 · danger runs 6 · alarmed 6 · missed 0 · mean lead 0.70 s (min 0.67 s)
 
 ## Learned model card
 

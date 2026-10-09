@@ -71,6 +71,14 @@ node --test --experimental-test-coverage   # coverage snapshot
    metrics without the `trainedOn.source` context (`synthetic-v1` is pipeline
    validation, not clinical evidence).
 
+- **Environment never inflates the score**: `config.risk.environment` is a
+  sensitivity channel (horizonScale) only. Slip/stub micro-events from
+  `core/environment.js` may trigger a bounded question; the user's answer sets
+  the hold window. Explicit `context.obstacle` is for tests/replay, not the UI.
+- **Training only dampens caution**: `config.training.dampenCaution` may
+  suppress *caution*-level cues during a session (journaled as `note`);
+  imminent/danger alarms are never suppressed. Keep it that way.
+
 ## Where to change what
 
 - thresholds/weights/timings -> `core/config.js`

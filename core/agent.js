@@ -27,6 +27,8 @@ import { SymptomState, adviceFor, SYMPTOM_LABELS } from './symptoms.js';
 import { buildWindowVector } from './learned.js';
 import { PatientStager } from './staging.js';
 import { carePlan } from './care.js';
+import { EnvironmentInference } from './environment.js';
+import { TrainingSession } from './training.js';
 
 const ACUTE = new Set(['imminent', 'danger']);
 
@@ -40,11 +42,15 @@ export class SisFallAgent {
     this.forecast = new RiskForecast(this.config);
     this.symptoms = new SymptomState(this.config);
     this.stager = new PatientStager(this.config);
+    this._envInference = new EnvironmentInference(this.config);
+    this.training = { active: false, session: null, source: null, startedAt: null, lastSummary: null };
+    this._trainingScores = [];
     this.policy = createPolicyState(0);
     this.lastT = 0;
     this._episode = null;
     this._activeSymptoms = new Set();
     this._lastStage = null;
+    this._lastEnvKey = null;
     this.stats = { frames: 0, maxScore: 0, episodes: [], actionCounts: {}, startedAt: null };
   }
 
@@ -87,10 +93,61 @@ export class SisFallAgent {
     };
   }
 
+  /** 用户回答环境询问。yes=true 确认环境风险一段时间（预警提前），否则驳回并静默。 */
+  ingestEnvironmentAnswer({ t = this.lastT, yes = false } = {}) {
+    const snapshot = this._envInference.answer({ t, yes });
+    this.journal.record({
+      t,
+      type: 'environment',
+      action: yes ? 'confirmed' : 'dismissed',
+      confirmedHoldSec: yes ? this.config.risk.environment.inference.confirmedHoldSec : 0,
+    });
+    return {
+      ...snapshot,
+      advice: yes
+        ? '已记录：环境风险。未来一段时间预警会提前，请放慢脚步。'
+        : '已记录：不调整。如有不适请报告症状。',
+    };
+  }
+
+  /** 开始一次康复训练会话（动作按当前阶段选择）。 */
+  startTraining(t = this.lastT, { source = 'manual' } = {}) {
+    if (this.training.active) return { ok: false, reason: '训练已在进行中' };
+    const stage = this.stager.result().stage;
+    const session = new TrainingSession({ stage, config: this.config, now: t });
+    this.training = { active: true, session, source, startedAt: t, lastSummary: this.training.lastSummary };
+    this._trainingScores = [];
+    this.journal.record({ t, type: 'training', action: 'start', stage, source, exercises: session.plan.length });
+    return { ok: true, stage, plan: session.plan, current: session.currentAt(t) };
+  }
+
+  /** 查询训练进度（纯查询，无副作用）。 */
+  trainingProgress(t = this.lastT) {
+    if (!this.training.active) return null;
+    return this.training.session.currentAt(t);
+  }
+
+  /** 结束训练（自然完成或手动）。返回会话摘要，并入 journal。 */
+  finishTraining(t = this.lastT, { completed = true } = {}) {
+    if (!this.training.active) return null;
+    const session = this.training.session;
+    const scores = this._trainingScores;
+    const summary = {
+      ...session.summary({ t, completed }),
+      source: this.training.source,
+      meanScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
+      maxScore: scores.length ? Math.max(...scores) : 0,
+    };
+    this.training = { active: false, session: null, source: null, startedAt: null, lastSummary: summary };
+    this._trainingScores = [];
+    this.journal.record({ t, type: 'training', action: completed ? 'finish' : 'stopped', ...summary });
+    return summary;
+  }
+
   /**
    * @param {object} observation { t, features, coverage?, context? }
    * @returns {object} step { t, state, features, coverage, risk, effective,
-   *   forecast, baseline, symptoms, stage, actions }
+   *   forecast, baseline, symptoms, environment, stage, actions }
    */
   ingest(observation = {}) {
     const { t = this.lastT, features = {}, context = {} } = observation;
@@ -131,26 +188,87 @@ export class SisFallAgent {
     const symptomContext = this.symptoms.at(t);
     const thresholds = this.config.risk.thresholds;
     const effectiveScore = Math.min(100, risk.score + symptomContext.boost);
+    // 症状在场时"注意"入口阈值下调（同样的分数，头晕时更值得提醒）——
+    // 这是"同一姿态在症状下更危险"的第二条表达路径（第一条是 boost 本身）。
+    const symptomCaution = symptomContext.boost >= (this.config.symptoms?.labelBoostFloor ?? 5);
+    const cautionEntry = symptomCaution
+      ? this.config.symptoms?.cautionThreshold ?? thresholds.caution
+      : thresholds.caution;
     const effective = {
       ...risk,
       score: effectiveScore,
       boost: symptomContext.boost,
-      level: effectiveScore >= thresholds.danger ? 'danger' : effectiveScore >= thresholds.caution ? 'caution' : 'stable',
+      level: effectiveScore >= thresholds.danger ? 'danger' : effectiveScore >= cautionEntry ? 'caution' : 'stable',
     };
+    if (this.training.active) this._trainingScores.push(effectiveScore);
+
+    // Environmental context: explicit injection (tests / demo / replay) plus
+    // sensor inference (slip micro-event -> bounded question -> user answer).
+    // Neither adds to the score; both shorten warning horizons through the
+    // sensitivity channel.
+    const envCfg = this.config.risk.environment?.horizonScale ?? {};
+    const explicitEnvScale = Math.min(
+      context.obstacle ? envCfg.obstacle ?? 1 : 1,
+      context.lowLight ? envCfg.lowLight ?? 1 : 1
+    );
+    this._envInference.update({ t, features });
+    const inferred = this._envInference.snapshot(t);
+    const horizonScale = Math.min(
+      symptomContext.horizonScale,
+      explicitEnvScale,
+      this._envInference.sensitivityScale(t)
+    );
+    const environment = {
+      obstacle: context.obstacle === true,
+      lowLight: context.lowLight === true,
+      horizonScale,
+      inferred: { active: inferred.active, confirmed: inferred.confirmed, lastEvent: inferred.lastEvent },
+      pendingQuestion: inferred.pendingQuestion,
+    };
+    const envKey = `${environment.obstacle}|${environment.lowLight}|${inferred.active}`;
+    if (this._lastEnvKey !== envKey) {
+      this._lastEnvKey = envKey;
+      this.journal.record({
+        t,
+        type: 'context',
+        obstacle: environment.obstacle,
+        lowLight: environment.lowLight,
+        inferredActive: inferred.active,
+        horizonScale,
+      });
+    }
 
     // Forecast runs on the effective score: the same trend is more urgent
-    // when symptoms are on board, and horizons extend accordingly.
+    // when symptoms or the environment are on board; horizons shrink accordingly.
     this.forecast.push(t, effectiveScore, features);
-    const forecast = this.forecast.result({ horizonScale: symptomContext.horizonScale });
+    const forecast = this.forecast.result({ horizonScale });
     const deviation = this.baseline.deviation(features);
     const baseline = { warm: this.baseline.warm, progress: this.baseline.progress, deviation };
 
-    const { state, actions, transition, policy } = decidePolicy(
+    const trainingContext = this.training.active
+      ? { active: true, exercise: this.training.session.currentAt(t).exercise?.name ?? null }
+      : { active: false };
+    const { state, actions: policyActions, transition, policy } = decidePolicy(
       this.policy,
-      { now: t, risk: effective, forecast, baseline, symptoms: symptomContext },
+      { now: t, risk: effective, forecast, baseline, symptoms: symptomContext, training: trainingContext },
       this.config
     );
     this.policy = policy;
+    const actions = [...policyActions];
+    // Active inquiry: a fresh slip micro-event in a settled state turns into
+    // one bounded question. The user's answer is the ground truth — the agent
+    // never assumes (see core/environment.js).
+    if (this._envInference.shouldAsk(t, state)) {
+      const question = this._envInference.pendingQuestion(t);
+      actions.push({
+        kind: 'question',
+        urgency: 'low',
+        text: question.text,
+        detail: question.detail,
+        reason: '疑似环境风险',
+        questionId: question.id,
+      });
+    }
 
     // Symptom activation / clearing events.
     const activeNow = new Set(symptomContext.active.map((item) => item.key));
@@ -232,6 +350,7 @@ export class SisFallAgent {
       forecast,
       baseline,
       symptoms: symptomContext,
+      environment,
       stage,
       actions,
     };
